@@ -128,18 +128,7 @@ This creates:
   - `tech-stack.md` (placeholder — populated by the AI assistant)
 - `PLAN_AUTOMATION.md` at the repo root
 
-#### Step B2: Populate project context
-
-The AI assistant populates these files as part of the Conductor workflow:
-
-- **`.conductor/product.md`** — product vision, goals, users, success criteria
-- **`.conductor/tech-stack.md`** — languages, frameworks, deployment, testing, constraints
-
-When you start your first track, Conductor will interview you and generate this context. Upon track completion, the assistant may propose updates if the track changed the product scope or introduced new tech.
-
-These files are "project-owned" — `conductor upgrade` will NOT overwrite them.
-
-#### Step B3: Add IDE integration (choose one)
+#### Step B2: Add IDE integration (choose one)
 
 **For Warp (global loader rule — manual setup)**
 
@@ -170,7 +159,7 @@ conductor integrate generic /path/to/your-project
 
 This creates `AGENTS.md` in your project.
 
-#### Step B4: Verify the installation
+#### Step B3: Verify the installation
 
 ```sh
 conductor doctor /path/to/your-project
