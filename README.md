@@ -186,32 +186,6 @@ Shows the installed Conductor version.
 
 ---
 
-## Quick Start Checklist
-
-If you want the minimal steps:
-
-```sh
-# 1. Clone conductor-kit (once)
-git clone https://github.com/jerrydblount/conductor-kit.git ~/conductor-kit
-
-# 2. Add alias (once)
-echo 'alias conductor="python3 ~/conductor-kit/bin/conductor"' >> ~/.zshrc
-source ~/.zshrc
-
-# 3. Init a project
-conductor init /path/to/your-project
-
-# 4. Add IDE integration (pick one)
-conductor integrate warp          # prints text for Warp global rule
-conductor integrate cursor /path/to/your-project
-conductor integrate generic /path/to/your-project
-
-# 6. Verify
-conductor doctor /path/to/your-project
-```
-
----
-
 ## Usage
 
 Conductor is opt-in. It only activates when you explicitly ask.
