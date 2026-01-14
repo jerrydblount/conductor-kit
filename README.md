@@ -188,14 +188,59 @@ Shows the installed Conductor version.
 
 ## Usage
 
-Conductor is opt-in. It only activates when you explicitly ask.
+Conductor is opt-in. It only activates when you explicitly trigger it.
 
-In your IDE, say things like:
-- "Use Conductor. Start a new track: payments-refactor"
-- "Use Conductor. Update the plan for track payments-refactor"
-- "Use Conductor. Execute the plan"
+### Trigger phrases
 
-The assistant will read `.conductor/CONDUCTOR.md` and follow its rules.
+The assistant will engage Conductor when you say:
+- "Start a new track" / "Create conductor track"
+- "Use Conductor"
+- "Update plan" / "Update the plan"
+- "Execute plan" / "Execute the plan" / "Implement the plan"
+- Or reference a Conductor artifact (e.g., "Check the spec for track X")
+
+If you don't use a trigger phrase, the assistant behaves normally.
+
+### The workflow
+
+#### 1. Start a track
+
+Say: "Start a new track for [Feature Name]"
+
+The assistant will:
+1. Create a track directory (`.conductor/tracks/<track_id>/`)
+2. Ask you to choose a canonical plan source (`warp_notebook` or `local_plan_markdown`)
+3. Interview you to gather requirements (goal, functional/non-functional requirements, out of scope, acceptance criteria)
+4. Generate `spec.md`
+
+#### 2. Plan
+
+Once the spec is ready, the assistant will:
+1. Generate `plan.md` based on the spec and canonical plan
+2. Break down work into phases and tasks
+3. Add phase checkpoints for manual verification
+4. Include token/cost estimates
+
+#### 3. Implement
+
+Say: "Execute the plan" or "Implement track <track_id>"
+
+The assistant will:
+1. Follow the TDD workflow (Red → Green → Refactor) defined in `.conductor/workflow.md`
+2. Update `plan.md` task statuses as it progresses (`[ ]` → `[~]` → `[x]`)
+3. Stop at phase checkpoints for you to verify before continuing
+
+#### 4. Finalize
+
+When the track is complete:
+1. The assistant may propose updates to `product.md` and `tech-stack.md` if the track changed product scope or introduced new tech
+2. The track can be archived to `.conductor/archive/`
+
+### Updating a plan
+
+If you modify the canonical plan (Warp notebook or local markdown), say: "Update the plan"
+
+The assistant will sync the canonical plan into the track, regenerate `spec.md` and `plan.md` (preserving any local overrides), and record a diff.
 
 ---
 
