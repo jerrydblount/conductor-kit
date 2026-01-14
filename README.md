@@ -124,21 +124,20 @@ This creates:
   - `workflow.md`, `CONDUCTOR_README.md`, config files
   - `tracks/` (where track folders will live)
   - `archive/` (used for backups)
-  - `product.md` (placeholder — you fill this in)
-  - `tech-stack.md` (placeholder — you fill this in)
+  - `product.md` (placeholder — populated by the AI assistant)
+  - `tech-stack.md` (placeholder — populated by the AI assistant)
 - `PLAN_AUTOMATION.md` at the repo root
 
-#### Step B2: Fill in project context (important!)
+#### Step B2: Populate project context
 
-Open and edit these two files in your project:
+The AI assistant populates these files as part of the Conductor workflow:
 
-**`.conductor/product.md`**
-Describe your product: what it is, who it's for, goals, success criteria.
+- **`.conductor/product.md`** — product vision, goals, users, success criteria
+- **`.conductor/tech-stack.md`** — languages, frameworks, deployment, testing, constraints
 
-**`.conductor/tech-stack.md`**
-Describe your tech stack: languages, frameworks, deployment, testing, constraints.
+When you start your first track, Conductor will interview you and generate this context. Upon track completion, the assistant may propose updates if the track changed the product scope or introduced new tech.
 
-These files are "project-owned" — upgrades will NOT overwrite them.
+These files are "project-owned" — `conductor upgrade` will NOT overwrite them.
 
 #### Step B3: Add IDE integration (choose one)
 
@@ -202,10 +201,7 @@ source ~/.zshrc
 # 3. Init a project
 conductor init /path/to/your-project
 
-# 4. Edit product + tech-stack context
-# (open .conductor/product.md and .conductor/tech-stack.md in your editor)
-
-# 5. Add IDE integration (pick one)
+# 4. Add IDE integration (pick one)
 conductor integrate warp          # prints text for Warp global rule
 conductor integrate cursor /path/to/your-project
 conductor integrate generic /path/to/your-project
