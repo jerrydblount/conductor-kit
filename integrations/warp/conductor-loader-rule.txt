@@ -1,0 +1,26 @@
+# Conductor Loader (Global Warp Rule)
+
+## Trigger condition (opt-in only)
+Apply this rule ONLY when the user explicitly:
+- Asks to "Start a new track"
+- Asks to "Use Conductor" / "Create conductor track"
+- Asks to "Update plan" / "Update the plan"
+- Asks to "Execute plan" / "Execute the plan" / "Implement the plan"
+- References a Conductor artifact (e.g., "spec for track X", "plan for track Y")
+
+If none of these conditions are met, proceed with normal behavior.
+
+## Behavior on trigger
+1) Check whether `.conductor/CONDUCTOR.md` exists in the current repo.
+2) If it does NOT exist:
+   - Tell the user Conductor is not installed in this repo.
+   - Instruct them to install it via `conductor init`.
+   - STOP.
+3) If it DOES exist:
+   - Read `.conductor/CONDUCTOR.md` and treat it as the authoritative Conductor protocol for this repo.
+   - Follow it strictly (including reading `.conductor/product.md`, `.conductor/tech-stack.md`, and `.conductor/workflow.md`).
+
+## Notes
+- This is a global Warp rule (stored in Warp settings), so it is not installed or upgraded by `conductor init` / `conductor upgrade`.
+- `conductor-kit` may update the template text over time (`integrations/warp/conductor-loader-rule.txt`).
+  Keeping the Warp global rule in sync is manual: re-copy/paste when the template changes.

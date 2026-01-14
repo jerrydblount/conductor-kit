@@ -1,0 +1,542 @@
+#!/usr/bin/env python3
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import difflib
+import json
+import shutil
+import sys
+from pathlib import Path
+from typing import Any
+
+
+def _utc_now_iso() -> str:
+    return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace(
+        "+00:00", "Z"
+    )
+
+
+def _read_text(path: Path) -> str:
+    return path.read_text(encoding="utf-8")
+
+
+def _write_text(path: Path, text: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+
+
+def _read_json(path: Path) -> dict[str, Any]:
+    return json.loads(_read_text(path))
+
+
+def _write_json(path: Path, obj: dict[str, Any]) -> None:
+    _write_text(path, json.dumps(obj, indent=2, sort_keys=True) + "\n")
+
+
+def _unified_diff(old: str, new: str, *, fromfile: str, tofile: str) -> str:
+    return "".join(
+        difflib.unified_diff(
+            old.splitlines(True),
+            new.splitlines(True),
+            fromfile=fromfile,
+            tofile=tofile,
+        )
+    )
+
+
+def _confirm(prompt: str, *, yes: bool) -> bool:
+    if yes:
+        return True
+    try:
+        resp = input(prompt).strip().lower()
+    except EOFError:
+        return False
+    return resp in {"y", "yes"}
+
+
+def _parse_semver(version: str) -> tuple[int, int, int] | None:
+    parts = version.strip().split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        return int(parts[0]), int(parts[1]), int(parts[2])
+    except ValueError:
+        return None
+
+
+def _kit_root() -> Path:
+    # bin/conductor -> kit root is parent directory
+    return Path(__file__).resolve().parents[1]
+
+
+def _kit_version() -> str:
+    version_path = _kit_root() / "template" / ".conductor" / "conductor_version.json"
+    try:
+        return str(_read_json(version_path).get("kit_version") or "0.0.0")
+    except Exception:
+        return "0.0.0"
+
+
+def _template_file(relative_path: str) -> Path:
+    return _kit_root() / "template" / relative_path
+
+
+def _copy_file(
+    src: Path,
+    dst: Path,
+    *,
+    dry_run: bool,
+) -> None:
+    if dry_run:
+        return
+    dst.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(src, dst)
+
+
+def _backup_file(path: Path, backup_dir: Path, *, dry_run: bool) -> None:
+    if not path.exists():
+        return
+    if dry_run:
+        return
+    backup_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(path, backup_dir / path.name)
+
+
+def _sync_text_file(
+    *,
+    src: Path,
+    dst: Path,
+    label: str,
+    dry_run: bool,
+    yes: bool,
+    overwrite: bool,
+    backup_dir: Path | None = None,
+) -> bool:
+    """Sync a text file from src -> dst.
+
+    Returns True if dst would change (or changed).
+    """
+    src_text = _read_text(src)
+
+    if not dst.exists():
+        print(f"CREATE {label}: {dst}")
+        if not dry_run:
+            _write_text(dst, src_text)
+        return True
+
+    dst_text = _read_text(dst)
+    if dst_text == src_text:
+        print(f"OK     {label}: {dst}")
+        return False
+
+    if not overwrite:
+        print(f"SKIP   {label}: {dst} (exists; use upgrade or overwrite flags)")
+        return False
+
+    diff = _unified_diff(dst_text, src_text, fromfile=str(dst), tofile=str(src))
+    print(f"DIFF   {label}: {dst} <- {src}")
+    print(diff.rstrip())
+
+    if not _confirm(f"Overwrite {dst}? [y/N] ", yes=yes):
+        print(f"SKIP   {label}: {dst} (not confirmed)")
+        return False
+
+    if backup_dir is not None:
+        print(f"BACKUP {label}: {dst} -> {backup_dir}")
+        _backup_file(dst, backup_dir, dry_run=dry_run)
+
+    print(f"WRITE  {label}: {dst}")
+    if not dry_run:
+        _write_text(dst, src_text)
+    return True
+
+
+def _ensure_dir(path: Path, *, dry_run: bool) -> None:
+    if path.exists():
+        return
+    print(f"MKDIR  {path}")
+    if dry_run:
+        return
+    path.mkdir(parents=True, exist_ok=True)
+
+
+def _install_or_upgrade(
+    target_repo: Path,
+    *,
+    dry_run: bool,
+    yes: bool,
+    overwrite_product: bool,
+    overwrite_techstack: bool,
+    accept_breaking: bool,
+    overwrite_managed_files: bool,
+) -> int:
+    target_repo = target_repo.resolve()
+    conductor_dir = target_repo / ".conductor"
+
+    # Create core dirs
+    _ensure_dir(conductor_dir, dry_run=dry_run)
+    _ensure_dir(conductor_dir / "tracks", dry_run=dry_run)
+    _ensure_dir(conductor_dir / "archive", dry_run=dry_run)
+
+    # Safety: never touch tracks contents.
+
+    # Version gating (only relevant on upgrade, but harmless on init)
+    installed_version_path = conductor_dir / "conductor_version.json"
+    installed_version = None
+    if installed_version_path.exists():
+        try:
+            installed_version = str(_read_json(installed_version_path).get("kit_version"))
+        except Exception:
+            installed_version = None
+
+    kit_version = _kit_version()
+    if installed_version is not None:
+        inst_sem = _parse_semver(installed_version)
+        kit_sem = _parse_semver(kit_version)
+        if inst_sem is not None and kit_sem is not None:
+            if kit_sem[0] > inst_sem[0] and not accept_breaking:
+                print(
+                    "ERROR: Refusing to upgrade across a MAJOR version without --accept-breaking."
+                )
+                print(f"Installed: {installed_version}  Target: {kit_version}")
+                return 2
+
+    # Common backup dir for product/tech-stack overwrites
+    do_backup = overwrite_product or overwrite_techstack
+    backup_dir = None
+    if do_backup:
+        backup_dir = (
+            conductor_dir
+            / "archive"
+            / "context_backups"
+            / _utc_now_iso().replace(":", "").replace("-", "")
+        )
+
+    # Sync Conductor-managed files
+    managed_text_files = [
+        (".conductor/CONDUCTOR.md", "rule"),
+        (".conductor/CONDUCTOR_README.md", "docs"),
+        (".conductor/workflow.md", "workflow"),
+    ]
+
+    managed_json_files = [
+        (".conductor/llm_estimator_defaults.json", "config"),
+        (".conductor/llm_pricing.json", "config"),
+        (".conductor/llm_usage_samples.jsonl", "config"),
+    ]
+
+    changed_any = False
+
+    for rel, label in managed_text_files:
+        src = _template_file(rel)
+        dst = target_repo / rel
+        changed_any |= _sync_text_file(
+            src=src,
+            dst=dst,
+            label=label,
+            dry_run=dry_run,
+            yes=yes,
+            overwrite=overwrite_managed_files,
+        )
+
+    # JSON/JSONL are treated as text for syncing
+    for rel, label in managed_json_files:
+        src = _template_file(rel)
+        dst = target_repo / rel
+        changed_any |= _sync_text_file(
+            src=src,
+            dst=dst,
+            label=label,
+            dry_run=dry_run,
+            yes=yes,
+            overwrite=overwrite_managed_files,
+        )
+
+    # Project-owned context
+    product_src = _template_file(".conductor/product.md")
+    tech_src = _template_file(".conductor/tech-stack.md")
+    product_dst = conductor_dir / "product.md"
+    tech_dst = conductor_dir / "tech-stack.md"
+
+    if not product_dst.exists():
+        changed_any |= _sync_text_file(
+            src=product_src,
+            dst=product_dst,
+            label="context",
+            dry_run=dry_run,
+            yes=yes,
+            overwrite=True,
+            backup_dir=None,
+        )
+    else:
+        changed_any |= _sync_text_file(
+            src=product_src,
+            dst=product_dst,
+            label="context",
+            dry_run=dry_run,
+            yes=yes,
+            overwrite=overwrite_product,
+            backup_dir=backup_dir,
+        )
+
+    if not tech_dst.exists():
+        changed_any |= _sync_text_file(
+            src=tech_src,
+            dst=tech_dst,
+            label="context",
+            dry_run=dry_run,
+            yes=yes,
+            overwrite=True,
+            backup_dir=None,
+        )
+    else:
+        changed_any |= _sync_text_file(
+            src=tech_src,
+            dst=tech_dst,
+            label="context",
+            dry_run=dry_run,
+            yes=yes,
+            overwrite=overwrite_techstack,
+            backup_dir=backup_dir,
+        )
+
+    # PLAN_AUTOMATION.md (repo root; managed)
+    plan_auto_src = _template_file("PLAN_AUTOMATION.md")
+    plan_auto_dst = target_repo / "PLAN_AUTOMATION.md"
+    changed_any |= _sync_text_file(
+        src=plan_auto_src,
+        dst=plan_auto_dst,
+        label="docs",
+        dry_run=dry_run,
+        yes=yes,
+        overwrite=overwrite_managed_files,
+    )
+
+    # Update installed version stamp (always managed)
+    stamp = {
+        "schema_version": 1,
+        "kit_version": kit_version,
+        "installed_at": _utc_now_iso(),
+    }
+    print(f"WRITE  version: {installed_version_path}")
+    if not dry_run:
+        _write_json(installed_version_path, stamp)
+
+    if changed_any:
+        print("DONE")
+    else:
+        print("DONE (no changes)")
+
+    return 0
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    return _install_or_upgrade(
+        args.path,
+        dry_run=args.dry_run,
+        yes=args.yes,
+        overwrite_product=args.overwrite_product,
+        overwrite_techstack=args.overwrite_techstack,
+        accept_breaking=args.accept_breaking,
+        overwrite_managed_files=True,
+    )
+
+
+def cmd_upgrade(args: argparse.Namespace) -> int:
+    return _install_or_upgrade(
+        args.path,
+        dry_run=args.dry_run,
+        yes=args.yes,
+        overwrite_product=args.overwrite_product,
+        overwrite_techstack=args.overwrite_techstack,
+        accept_breaking=args.accept_breaking,
+        overwrite_managed_files=True,
+    )
+
+
+def cmd_version(args: argparse.Namespace) -> int:
+    repo = args.path.resolve()
+    version_path = repo / ".conductor" / "conductor_version.json"
+    if not version_path.exists():
+        print(f"ERROR: Conductor is not installed (missing {version_path})")
+        return 1
+    data = _read_json(version_path)
+    print(f"installed_version: {data.get('kit_version')}")
+    print(f"installed_at: {data.get('installed_at')}")
+    return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    repo = args.path.resolve()
+    conductor_dir = repo / ".conductor"
+    ok = True
+
+    def check_exists(path: Path, kind: str) -> None:
+        nonlocal ok
+        if path.exists():
+            print(f"OK     {kind}: {path}")
+        else:
+            print(f"MISSING {kind}: {path}")
+            ok = False
+
+    check_exists(conductor_dir, "dir")
+    check_exists(conductor_dir / "tracks", "dir")
+    check_exists(conductor_dir / "archive", "dir")
+
+    check_exists(conductor_dir / "CONDUCTOR.md", "file")
+    check_exists(conductor_dir / "CONDUCTOR_README.md", "file")
+    check_exists(conductor_dir / "workflow.md", "file")
+    check_exists(conductor_dir / "product.md", "file")
+    check_exists(conductor_dir / "tech-stack.md", "file")
+
+    check_exists(conductor_dir / "llm_estimator_defaults.json", "file")
+    check_exists(conductor_dir / "llm_pricing.json", "file")
+    check_exists(conductor_dir / "llm_usage_samples.jsonl", "file")
+
+    check_exists(conductor_dir / "conductor_version.json", "file")
+    check_exists(repo / "PLAN_AUTOMATION.md", "file")
+
+    # Version + optional drift check (only if versions match)
+    installed_version = None
+    version_path = conductor_dir / "conductor_version.json"
+    if version_path.exists():
+        try:
+            installed_version = str(_read_json(version_path).get("kit_version"))
+        except Exception:
+            installed_version = None
+
+    kit_version = _kit_version()
+    if installed_version is not None:
+        print(f"INFO   installed_version: {installed_version}")
+        print(f"INFO   kit_version: {kit_version}")
+        if installed_version == kit_version:
+            # Basic drift check for managed files.
+            managed = [
+                ".conductor/CONDUCTOR.md",
+                ".conductor/CONDUCTOR_README.md",
+                ".conductor/workflow.md",
+                ".conductor/llm_estimator_defaults.json",
+                ".conductor/llm_pricing.json",
+                ".conductor/llm_usage_samples.jsonl",
+                "PLAN_AUTOMATION.md",
+            ]
+            for rel in managed:
+                src = _template_file(rel)
+                dst = repo / rel
+                if dst.exists() and src.exists() and _read_text(dst) != _read_text(src):
+                    print(f"DRIFT  managed: {dst}")
+                    ok = False
+        else:
+            print(
+                "INFO   drift check skipped (installed version differs from this conductor-kit)"
+            )
+
+    return 0 if ok else 1
+
+
+def cmd_integrate(args: argparse.Namespace) -> int:
+    repo = args.path.resolve()
+    kind = args.kind
+
+    if kind == "warp":
+        rule_path = _kit_root() / "integrations" / "warp" / "conductor-loader-rule.txt"
+        print("Warp integration is manual (global Warp rule).")
+        print(f"Template: {rule_path}")
+        print("---")
+        print(_read_text(rule_path).rstrip())
+        return 0
+
+    if kind == "cursor":
+        src = _kit_root() / "integrations" / "cursor" / ".cursorrules"
+        dst = repo / ".cursorrules"
+        print(f"WRITE  cursor: {dst} <- {src}")
+        if not args.dry_run:
+            _copy_file(src, dst, dry_run=False)
+        return 0
+
+    if kind == "generic":
+        src = _kit_root() / "integrations" / "generic" / "AGENTS.md"
+        dst = repo / "AGENTS.md"
+        print(f"WRITE  generic: {dst} <- {src}")
+        if not args.dry_run:
+            _copy_file(src, dst, dry_run=False)
+        return 0
+
+    print(f"ERROR: Unknown integration kind: {kind}")
+    return 2
+
+
+def build_parser() -> argparse.ArgumentParser:
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument("--dry-run", action="store_true", help="Print actions without writing")
+    common.add_argument("--yes", action="store_true", help="Assume yes for prompts")
+
+    # Include common flags on the root parser so they can appear before the subcommand.
+    p = argparse.ArgumentParser(prog="conductor", parents=[common])
+
+    sub = p.add_subparsers(dest="cmd", required=True)
+
+    def add_common_flags(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("path", nargs="?", default=Path("."), type=Path)
+        sp.add_argument(
+            "--overwrite-product",
+            action="store_true",
+            help="Overwrite .conductor/product.md from template (backs up first)",
+        )
+        sp.add_argument(
+            "--overwrite-techstack",
+            action="store_true",
+            help="Overwrite .conductor/tech-stack.md from template (backs up first)",
+        )
+        sp.add_argument(
+            "--accept-breaking",
+            action="store_true",
+            help="Allow upgrading across a MAJOR version",
+        )
+
+    sp_init = sub.add_parser(
+        "init", parents=[common], help="Install Conductor into a repo"
+    )
+    add_common_flags(sp_init)
+    sp_init.set_defaults(func=cmd_init)
+
+    sp_upgrade = sub.add_parser(
+        "upgrade", parents=[common], help="Upgrade an existing Conductor install"
+    )
+    add_common_flags(sp_upgrade)
+    sp_upgrade.set_defaults(func=cmd_upgrade)
+
+    sp_version = sub.add_parser(
+        "version", parents=[common], help="Print installed Conductor version"
+    )
+    sp_version.add_argument("path", nargs="?", default=Path("."), type=Path)
+    sp_version.set_defaults(func=cmd_version)
+
+    sp_doctor = sub.add_parser(
+        "doctor", parents=[common], help="Check Conductor installation health"
+    )
+    sp_doctor.add_argument("path", nargs="?", default=Path("."), type=Path)
+    sp_doctor.set_defaults(func=cmd_doctor)
+
+    sp_integrate = sub.add_parser(
+        "integrate", parents=[common], help="Install IDE integration files"
+    )
+    sp_integrate.add_argument(
+        "kind", choices=["warp", "cursor", "generic"], help="Integration kind"
+    )
+    sp_integrate.add_argument("path", nargs="?", default=Path("."), type=Path)
+    sp_integrate.set_defaults(func=cmd_integrate)
+
+    return p
+
+
+def main(argv: list[str]) -> int:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+    return int(args.func(args))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main(sys.argv[1:]))

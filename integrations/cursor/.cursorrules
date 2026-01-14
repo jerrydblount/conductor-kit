@@ -1,0 +1,10 @@
+# Cursor rules: Conductor (opt-in)
+
+Apply Conductor ONLY when the user explicitly asks to "Start a new track", "Use Conductor", "Create conductor track", "Update plan", or "Execute plan".
+
+On Conductor opt-in:
+- If `.conductor/CONDUCTOR.md` exists in this repo, read it and follow it as the authoritative Conductor protocol.
+- If `.conductor/CONDUCTOR.md` does not exist, tell the user Conductor is not installed in this repo and instruct them to install it with `conductor init`.
+
+When not opted-in:
+- Behave normally.
