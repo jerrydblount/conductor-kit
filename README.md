@@ -1,6 +1,6 @@
 # Conductor Kit
 
-Conductor Kit is a port of the Gemini CLI extension [Conductor](https://geminicli.com/extensions/?name=gemini-cli-extensionsconductor). This is not a 1:1, rather it's a very close recreation with some modifications and additional features. 
+Conductor Kit is a port of the Gemini CLI extension [Conductor](https://geminicli.com/extensions/?name=gemini-cli-extensionsconductor). This is not a 1:1, rather it's a close recreation with some modifications and additional features. 
 The goal of Conductor Kit is to enable non-Gemini CLI users to benefit from the context-driven approach. 
 Conductor Kit supports Warp, Cursor, or any agentic IDE.
 
