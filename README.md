@@ -51,53 +51,6 @@ usage: conductor [-h] [--dry-run] [--yes] {init,upgrade,version,doctor,integrate
 
 If that works, Conductor Kit is installed.
 
-#### Step A3: (Recommended) Make `conductor` available as a command
-
-Choose one of these options:
-
-**Option 1: Shell alias (simplest)**
-
-Add this line to your shell config file (`~/.zshrc` or `~/.bashrc`):
-
-```sh
-alias conductor="python3 ~/conductor-kit/bin/conductor"
-```
-
-Then reload:
-
-```sh
-source ~/.zshrc
-```
-
-Now you can run `conductor` from anywhere.
-
-**Option 2: Symlink on PATH (cleaner long-term)**
-
-```sh
-mkdir -p ~/.local/bin
-ln -sf ~/conductor-kit/bin/conductor ~/.local/bin/conductor
-```
-
-Make sure `~/.local/bin` is on your PATH. Add this to `~/.zshrc` if needed:
-
-```sh
-export PATH="$HOME/.local/bin:$PATH"
-```
-
-Reload:
-
-```sh
-source ~/.zshrc
-```
-
-**Option 3: Use the full path every time (no setup)**
-
-Just run:
-
-```sh
-python3 ~/conductor-kit/bin/conductor <command>
-```
-
 ---
 
 ### Part B: Install Conductor into a project repo
@@ -109,13 +62,13 @@ Repeat these steps for each repo where you want to use Conductor.
 From anywhere, run:
 
 ```sh
-conductor init /path/to/your-project
+python3 ~/conductor-kit/bin/conductor init /path/to/your-project
 ```
 
 Or, if you are already in the project root:
 
 ```sh
-conductor init .
+python3 ~/conductor-kit/bin/conductor init .
 ```
 
 This creates:
@@ -136,7 +89,7 @@ Warp uses a single global rule that delegates to the repo-local `.conductor/COND
 
 1. Run this to see the rule text:
    ```sh
-   conductor integrate warp
+   python3 ~/conductor-kit/bin/conductor integrate warp
    ```
 2. Copy the printed text.
 3. Paste it into Warp's global rules (Warp Settings → Rules).
@@ -146,7 +99,7 @@ Note: This is a one-time manual step. `conductor init` / `conductor upgrade` can
 **For Cursor (repo-local)**
 
 ```sh
-conductor integrate cursor /path/to/your-project
+python3 ~/conductor-kit/bin/conductor integrate cursor /path/to/your-project
 ```
 
 This creates `.cursorrules` in your project.
@@ -154,7 +107,7 @@ This creates `.cursorrules` in your project.
 **For other IDEs / generic (repo-local)**
 
 ```sh
-conductor integrate generic /path/to/your-project
+python3 ~/conductor-kit/bin/conductor integrate generic /path/to/your-project
 ```
 
 This creates `AGENTS.md` in your project.
@@ -162,13 +115,13 @@ This creates `AGENTS.md` in your project.
 #### Step B3: Verify the installation
 
 ```sh
-conductor doctor /path/to/your-project
+python3 ~/conductor-kit/bin/conductor doctor /path/to/your-project
 ```
 
 You should see `OK` for all required files and directories.
 
 ```sh
-conductor version /path/to/your-project
+python3 ~/conductor-kit/bin/conductor version /path/to/your-project
 ```
 
 Shows the installed Conductor version.
