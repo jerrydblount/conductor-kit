@@ -1,6 +1,8 @@
 # Conductor Kit
 
-Conductor Kit is a portable, installable version of the Conductor workflow.
+Conductor Kit is a port of the Gemini CLI extension [Conductor](https://geminicli.com/extensions/?name=gemini-cli-extensionsconductor). This is not a 1:1, rather it's a very close recreation with some modifications and additional features. 
+The goal of Conductor Kit is to enable non-Gemini CLI users to benefit from the spec-driven approach. 
+Conductor Kit supports Warp, Cursor, or any agentic IDE.
 
 Conductor is a repo-local, IDE-agnostic way to run context-driven development:
 - You keep the workflow, product context, and tech constraints in the repo under `.conductor/`.
