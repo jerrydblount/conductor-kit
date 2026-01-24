@@ -2,7 +2,7 @@
 
 ## Guiding Principles
 
-1. **The Canonical Plan is Canonical:** The track’s canonical plan source (Warp notebook or local markdown) is the source of truth for Conductor `spec.md` + `plan.md`. If there is any conflict, STOP and reconcile. The canonical plan wins.
+1. **The Canonical Plan is Canonical:** The track’s canonical plan source (repo-local markdown) is the source of truth for Conductor `spec.md` + `plan.md`. If there is any conflict, STOP and reconcile. The canonical plan wins.
 2. **Conductor Artifacts are Generated:** `spec.md` and `plan.md` are treated as generated outputs from the canonical plan snapshot, except for explicit LOCAL OVERRIDES blocks.
 3. **The Plan is the Source of Truth:** All work must be tracked in `plan.md`
 4. **The Tech Stack is Deliberate:** Changes to the tech stack must be documented in `tech-stack.md` *before* implementation
@@ -20,9 +20,8 @@ Every track MUST include Phase 0 tasks that ensure the Conductor artifacts are a
 Required Phase 0 tasks
 - Canonical plan linkage
   - Ensure `.conductor/tracks/<track_id>/metadata.json` contains:
-    - `canonical_plan_source`: `warp_notebook` | `local_plan_markdown`
-    - If `warp_notebook`: `canonical_warp_plan_url`, `canonical_warp_notebook_id`
-    - If `local_plan_markdown`: `canonical_local_plan_path`
+    - `canonical_plan_source`: `local_plan_markdown`
+    - `canonical_local_plan_path`
   - Ensure `spec.md` and `plan.md` include a reference to the canonical plan near the top.
 - Snapshot + diff tracking (required)
   - Generate/refresh `.conductor/tracks/<track_id>/canonical_plan_snapshot.md` from the canonical plan source.
