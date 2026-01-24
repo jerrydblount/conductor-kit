@@ -8,6 +8,9 @@ Conductor Kit follows Semantic Versioning (SemVer).
 
 ## [0.2.0] - 2026-01-24
 
+Added:
+- Added plan scanning commands: "scan plan" (in-chat report) and "save scan report" (optional repo-local report file).
+
 Changed:
 - Removed Warp notebook as a canonical plan source. Canonical plans are now repo-local markdown only (`local_plan_markdown`).
 

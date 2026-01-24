@@ -5,6 +5,8 @@
 - Asks to "Start a new track"
 - Asks to "Use Conductor" / "Create conductor track"
 - Asks to "Update plan" / "Update the plan"
+- Asks to "Scan plan" / "Scan the plan"
+- Asks to "Save scan report"
 - Asks to "Execute plan" / "Execute the plan" / "Implement the plan"
 - References a specific Conductor artifact (e.g., "Check the spec for track X")
 
@@ -86,10 +88,11 @@ Rules
 
 #### B. Implementing a Track
 1.  **Read Context:** Read `spec.md` and `plan.md` for the track.
-2.  **Follow Workflow:** Adhere strictly to `.conductor/workflow.md`.
+2.  **Recommend Plan Scan (Recommended):** Offer to run "scan plan" first to catch contradictions, conflicts, and gaps before implementation. If the user declines, proceed.
+3.  **Follow Workflow:** Adhere strictly to `.conductor/workflow.md`.
     -   **TDD:** Red -> Green -> Refactor.
     -   **Checkpoints:** Stop at Phase Checkpoints for manual verification.
-3.  **Update Plan:** Mark tasks as `[~]` (In Progress) and `[x]` (Done) with commit hashes.
+4.  **Update Plan:** Mark tasks as `[~]` (In Progress) and `[x]` (Done) with commit hashes.
 
 #### C. Updating a Track from the Canonical Plan ("update plan")
 When the user asks to "update plan", you MUST:
@@ -110,6 +113,55 @@ Constraints
 - Do not modify application code during "update plan".
 - If the canonical plan cannot be accessed at update time, STOP and report what is missing.
 - Reference: `PLAN_AUTOMATION.md`.
+
+#### D. Scanning a Plan ("scan plan")
+When the user asks to "scan plan" (or "scan the plan"), you MUST perform a deep, read-only review and produce a scan report.
+
+Inputs to read (minimum)
+- `.conductor/product.md`
+- `.conductor/tech-stack.md`
+- `.conductor/workflow.md`
+- `.conductor/tracks/<track_id>/metadata.json`
+- `.conductor/tracks/<track_id>/spec.md` (if present)
+- `.conductor/tracks/<track_id>/plan.md` (if present)
+- Canonical plan markdown (required for cross-checks)
+  - Prefer: the repo-local file at the path in `metadata.json` -> `canonical_local_plan_path`
+  - Also read (if present): `.conductor/tracks/<track_id>/canonical_plan_snapshot.md` and call out any drift vs the canonical plan file
+
+Hard stop / required clarifications
+- If `track_id` is not specified and cannot be inferred unambiguously, ask which track to scan.
+- If the canonical plan markdown cannot be read (missing path, missing file, or inaccessible), the scan report MUST include this as a BLOCKER and ask the user what the canonical plan path should be (or instruct to run "update plan" if appropriate).
+
+Scan checks (minimum)
+1) Conflicts between phases and tasks
+- Task ordering issues (prerequisites missing, outputs referenced before produced)
+- Duplicate tasks that conflict in intent, scope, or expected outputs
+- Phase boundary issues (work that belongs in earlier phases is scheduled later; missing checkpoints)
+
+2) Contradictions in requirements
+- Canonical plan vs spec vs plan mismatches
+- Internal contradictions within the canonical plan, within spec, or within plan
+
+3) Gaps in requirements and coverage
+- Acceptance criteria not covered by tasks/tests
+- Missing non-functional work implied by requirements (performance, security, migrations, observability, rollout/rollback)
+- Missing verification steps or definition-of-done tasks required by `.conductor/workflow.md`
+
+4) Agent understanding gaps
+- Flag ambiguous or underspecified requirements, unclear user flows, unclear inputs/outputs, or missing context.
+- Ask targeted clarification questions when ambiguity blocks a confident scan.
+
+Output requirements
+- Produce a structured "Plan Scan Report" in chat.
+- Group findings by severity: BLOCKER / WARNING / SUGGESTION.
+- Each finding MUST include: what is wrong, why it matters, and a concrete recommendation (typically plan/spec edits).
+- Include a "Questions for you" section when clarification is required.
+- The scan MUST NOT modify files by default.
+
+Optional saving ("save scan report")
+- If the user asks to "save scan report" (either as a follow-up or in the same message), write the report to:
+  - `.conductor/tracks/<track_id>/plan_scans/<YYYYMMDD_HHMMSSZ>.md`
+- If no scan report has been produced in the current run, perform the scan first, then save.
 
 ### Phase 3: Finalization
 1.  **Sync Documentation:** Upon track completion, review `product.md` and `tech-stack.md`. Propose updates if the track changed the product scope or introduced new tech.

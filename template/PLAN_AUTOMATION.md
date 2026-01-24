@@ -86,11 +86,23 @@ Update `.conductor/tracks/<track_id>/metadata.json` with:
 Hard stop rule:
 - If the snapshot cannot be generated (canonical plan not accessible), the agent must STOP and report what is missing.
 
-### 4) "execute plan" / "execute the plan" / "implement the plan"
+### 4) "scan plan" / "scan the plan"
 Agent behavior:
+- Ask for the track id (if not provided).
+- Read the canonical plan markdown and cross-check it against the track `spec.md` and `plan.md`.
+- Produce a structured scan report in chat (do not write files unless the user asks to "save scan report").
+
+### 5) "execute plan" / "execute the plan" / "implement the plan"
+Agent behavior:
+- Recommend running "scan plan" first (optional but recommended).
 - Read the track `spec.md` + `plan.md`.
 - Implement tasks phase-by-phase per `.conductor/workflow.md`.
 - Stop at checkpoints.
+
+### 6) "save scan report"
+Agent behavior:
+- Save the most recent scan report to `.conductor/tracks/<track_id>/plan_scans/<YYYYMMDD_HHMMSSZ>.md`.
+- If no scan has been run yet, run "scan plan" first, then save.
 
 ## Track file layout (required)
 Each track directory uses this layout:
