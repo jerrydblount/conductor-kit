@@ -23,8 +23,7 @@ Before planning or implementing, you MUST read:
 ### Phase 1.5: Canonical Plan (Required)
 Each track MUST have a single canonical plan source of truth.
 
-Conductor supports two canonical plan sources:
-- `warp_notebook`: a Warp Drive notebook URL/ID
+Conductor supports one canonical plan source:
 - `local_plan_markdown`: a repo-local markdown file (recommended default: `.conductor/tracks/<track_id>/canonical_plan.md`)
 
 Conductor track artifacts grounded in the canonical plan:
@@ -35,18 +34,13 @@ Rules
 - The Conductor artifacts must be a faithful, executable elaboration of the canonical plan (what/why/how).
 - If there is a conflict between the canonical plan and Conductor artifacts, STOP and reconcile. The canonical plan wins.
 - Each track MUST record its canonical plan source in `.conductor/tracks/<track_id>/metadata.json`:
-  - `canonical_plan_source`: `warp_notebook` | `local_plan_markdown`
-  - If `warp_notebook`:
-    - `canonical_warp_plan_url`
-    - `canonical_warp_notebook_id`
-  - If `local_plan_markdown`:
-    - `canonical_local_plan_path` (e.g., `.conductor/tracks/<track_id>/canonical_plan.md`)
+  - `canonical_plan_source`: `local_plan_markdown`
+  - `canonical_local_plan_path` (e.g., `.conductor/tracks/<track_id>/canonical_plan.md`)
 - Each track MUST maintain diffable snapshots of the canonical plan:
   - `.conductor/tracks/<track_id>/canonical_plan_snapshot.md`
   - `.conductor/tracks/<track_id>/canonical_plan_snapshots/`
   - `.conductor/tracks/<track_id>/canonical_plan_diffs/`
   - Reference: `PLAN_AUTOMATION.md`.
-- Backward compatibility: older tracks may use `warp_plan_snapshot.md` / `warp_plan_snapshots/` / `warp_plan_diffs/`. Tooling should support both naming schemes.
 
 ### Phase 1.6: Token + Cost Estimation (Plan Budgeting)
 When generating or updating `.conductor/tracks/<track_id>/plan.md`, you MUST include a **Token & Cost Estimate (Generated)** section near the top of the GENERATED block.
@@ -68,15 +62,9 @@ Rules
 
 #### A. Starting a New Track
 1.  **Create Directory:** `.conductor/tracks/<track_id>/` (Format: `feature_name_YYYYMMDD`)
-2.  **Canonical Plan (Required):** Ask the user which canonical plan source to use:
-    - If `warp_notebook`: ask for the canonical Warp Drive notebook URL.
-      - Store it in `.conductor/tracks/<track_id>/metadata.json` under `canonical_warp_plan_url`.
-      - Derive and store the notebook id under `canonical_warp_notebook_id`.
-      - Include the URL at the top of both `spec.md` and `plan.md`.
-    - If `local_plan_markdown`:
-      - Create `.conductor/tracks/<track_id>/canonical_plan.md` (or use a user-provided path) and ask the user to provide the canonical plan content.
-      - Store the path in `metadata.json` under `canonical_local_plan_path`.
-      - Include a reference to the canonical plan at the top of `spec.md` and `plan.md`.
+2.  **Canonical Plan (Required):** Create `.conductor/tracks/<track_id>/canonical_plan.md` (or use a user-provided path) and ask the user to provide the canonical plan content.
+    - Store the path in `metadata.json` under `canonical_local_plan_path` and set `canonical_plan_source` to `local_plan_markdown`.
+    - Include a reference to the canonical plan at the top of `spec.md` and `plan.md`.
     - Initialize plan automation artifacts:
       - `canonical_plan_snapshot.md`
       - `canonical_plan_snapshots/`
@@ -107,7 +95,7 @@ Rules
 When the user asks to "update plan", you MUST:
 1. Read `.conductor/tracks/<track_id>/metadata.json` to identify:
    - `canonical_plan_source`
-   - canonical pointer fields (`canonical_warp_plan_url` / `canonical_warp_notebook_id` OR `canonical_local_plan_path`)
+   - `canonical_local_plan_path`
 2. Sync the canonical plan into the track snapshot:
    - Update `.conductor/tracks/<track_id>/canonical_plan_snapshot.md`
    - Write a timestamped snapshot to `canonical_plan_snapshots/`

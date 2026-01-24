@@ -7,7 +7,7 @@ Conductor Kit supports Warp, Cursor, or any agentic IDE.
 Conductor Kit is a repo-local, IDE-agnostic way to run context-driven development:
 - You keep the workflow, product context, and tech constraints in the repo under `.conductor/`.
 - Work is organized into **tracks** (`.conductor/tracks/<track-name>/`) with a `spec.md`, `plan.md`, and `metadata.json`.
-- Plans are captured in a **canonical plan** format (Warp notebook or local markdown) and converted into Conductor tracks.
+- Plans are captured in a **canonical plan** format (repo-local markdown) and converted into Conductor tracks.
 - The system produces durable artifacts (snapshots and diffs) so work is auditable and repeatable.
 
 This repository contains:
@@ -151,7 +151,7 @@ Say: "Start a new track for [Feature Name]"
 
 The assistant will:
 1. Create a track directory (`.conductor/tracks/<track_id>/`)
-2. Ask you to choose a canonical plan source (`warp_notebook` or `local_plan_markdown`)
+2. Ask you for the canonical plan markdown file (default: `.conductor/tracks/<track_id>/canonical_plan.md`) and the canonical plan content
 3. Interview you to gather requirements (goal, functional/non-functional requirements, out of scope, acceptance criteria)
 4. Generate `spec.md`
 
@@ -180,7 +180,7 @@ When the track is complete:
 
 ### Updating a plan
 
-If you modify the canonical plan (Warp notebook or local markdown), say: "Update the plan"
+If you modify the canonical plan markdown file, say: "Update the plan"
 
 The assistant will sync the canonical plan into the track, regenerate `spec.md` and `plan.md` (preserving any local overrides), and record a diff.
 
@@ -236,9 +236,8 @@ All commands accept `--dry-run` (print actions without writing) and `--yes` (aut
 The `.conductor/` directory is the source of truth for how Conductor operates in a repo.
 
 ### Canonical plan
-Conductor supports two canonical plan sources:
-- `warp_notebook`: a Warp-native plan format (machine-readable in Warp)
-- `local_plan_markdown`: a plain markdown plan (works anywhere)
+Conductor supports one canonical plan source:
+- `local_plan_markdown`: a repo-local markdown plan (works anywhere)
 
 Snapshots and diffs use generic names:
 - `canonical_plan_snapshot.md`

@@ -6,6 +6,11 @@ Conductor Kit follows Semantic Versioning (SemVer).
 - Minor: backwards-compatible features
 - Major: breaking changes (see BREAKING CHANGES notes below and `UPGRADING.md`)
 
+## [0.2.0] - 2026-01-24
+
+Changed:
+- Removed Warp notebook as a canonical plan source. Canonical plans are now repo-local markdown only (`local_plan_markdown`).
+
 ## [0.1.0] - 2026-01-14
 
 Initial release.

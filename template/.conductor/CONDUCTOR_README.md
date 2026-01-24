@@ -16,7 +16,7 @@ To begin a new feature or bug fix, ask:
 
 The agent will:
 1. Create a new directory in `.conductor/tracks/<track_id>/`.
-2. Ask you to choose a canonical plan source (`warp_notebook` or `local_plan_markdown`).
+2. Ask you for the canonical plan markdown file (default: `.conductor/tracks/<track_id>/canonical_plan.md`) and the canonical plan content.
 3. Interview you to gather requirements.
 4. Generate a `spec.md`.
 
