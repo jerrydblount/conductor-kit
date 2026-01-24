@@ -6,7 +6,7 @@ Conductor is a context-driven development framework implemented as repo-local ar
 
 ### 1) Opt-In
 Conductor is opt-in. The agent will only enforce the Conductor workflow when you explicitly ask for it.
-- Trigger phrases include: "Start a new track", "Use Conductor", "Create conductor track", "Update plan", "Execute plan".
+- Trigger phrases include: "Start a new track", "Use Conductor", "Create conductor track", "Update plan", "Scan plan", "Execute plan", "Save scan report".
 
 ### 2) The Workflow
 
@@ -25,6 +25,14 @@ Once the `spec.md` is approved, the agent will:
 1. Generate a `plan.md` based on the spec and canonical plan.
 2. Break down the work into phases and tasks.
 3. Inject phase checkpoints for manual verification.
+
+#### Step 2.5: Scan (Recommended)
+Before implementation, you can ask:
+> "Scan plan"
+
+The agent will:
+1. Cross-check the canonical plan markdown against `spec.md` and `plan.md`.
+2. Produce a structured scan report (conflicts, contradictions, gaps, and clarification questions).
 
 #### Step 3: Implement
 Ask the agent:

@@ -5,6 +5,8 @@ Use Conductor ONLY when the user explicitly asks to:
 - "Start a new track"
 - "Use Conductor" / "Create conductor track"
 - "Update plan" / "Update the plan"
+- "Scan plan" / "Scan the plan"
+- "Save scan report"
 - "Execute plan" / "Execute the plan" / "Implement the plan"
 - or references Conductor artifacts (e.g., a specific track `spec.md` / `plan.md`).
 

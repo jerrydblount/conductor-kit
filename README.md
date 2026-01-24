@@ -138,6 +138,8 @@ The assistant will engage Conductor when you say:
 - "Start a new track" / "Create conductor track"
 - "Use Conductor"
 - "Update plan" / "Update the plan"
+- "Scan plan" / "Scan the plan"
+- "Save scan report"
 - "Execute plan" / "Execute the plan" / "Implement the plan"
 - Or reference a Conductor artifact (e.g., "Check the spec for track X")
 
@@ -183,6 +185,14 @@ When the track is complete:
 If you modify the canonical plan markdown file, say: "Update the plan"
 
 The assistant will sync the canonical plan into the track, regenerate `spec.md` and `plan.md` (preserving any local overrides), and record a diff.
+
+### Scanning a plan (recommended)
+
+Before implementation, say: "Scan plan"
+
+The assistant will cross-check the canonical plan markdown against the track `spec.md` and `plan.md`, then produce a structured scan report highlighting conflicts, contradictions, gaps, and clarification questions.
+
+To save the report to the repo (optional), say: "Save scan report".
 
 ---
 
