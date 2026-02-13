@@ -6,6 +6,22 @@ Conductor Kit follows Semantic Versioning (SemVer).
 - Minor: backwards-compatible features
 - Major: breaking changes (see BREAKING CHANGES notes below and `UPGRADING.md`)
 
+## [0.3.0] - 2026-02-12
+
+Added:
+- Conductor Memory (local MVP): lossless per-track transcript JSONL + state.
+- New CLI commands:
+  - `conductor memory append`
+  - `conductor memory summarize`
+  - `conductor memory backfill-db`
+  - `conductor memory sync` (stub)
+  - `conductor memory db {up,down,status,migrate,psql}`
+- Repo template additions under `.conductor/memory/` (config, docker compose, SQL migrations).
+- `.conductor/.gitignore` defaults to keep lossless transcripts and tool artifacts uncommitted.
+
+Changed:
+- `conductor doctor` now checks Memory template files and prints advisory local DB dependency status.
+
 ## [0.2.0] - 2026-01-24
 
 Added:

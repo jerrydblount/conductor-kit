@@ -1,0 +1,13 @@
+# Conductor tracks are project-owned. Most are committed.
+# Memory transcripts are lossless and often contain sensitive tool output.
+# Keep them uncommitted by default.
+
+# Per-track memory (canonical)
+tracks/*/memory/transcript.jsonl
+tracks/*/memory/state.json
+tracks/*/memory/transcript.lock
+tracks/*/memory/artifacts/
+
+# Optional local DB overrides
+memory/*.local.json
+memory/.env
