@@ -22,6 +22,38 @@ Before planning or implementing, you MUST read:
 - `.conductor/tech-stack.md`
 - `.conductor/workflow.md`
 
+### Phase 1.2: Conductor Memory (Required)
+When Conductor is triggered, Conductor Memory is enabled.
+
+Goals
+- Persist a **lossless transcript** of the user↔agent conversation.
+- Persist tool activity (tool calls + tool results).
+
+Canonical store (per track)
+- `.conductor/tracks/<track_id>/memory/transcript.jsonl` (append-only)
+- `.conductor/tracks/<track_id>/memory/state.json`
+
+Hard requirements
+- **Fail closed:** If a memory append fails (cannot persist locally), you MUST STOP and report the error.
+  - You MUST offer an explicit override: the user can tell you to continue by saying: "continue without memory".
+- You MUST append these event types:
+  - `message`: for every user and assistant message
+  - `tool_call`: before each tool invocation
+  - `tool_result`: after each tool completes
+  - `artifact`: when large tool output or other blobs are stored as files
+
+Journaler (preferred, Tier 2)
+- Use the CLI journaler:
+  - `conductor memory append --track-id <track_id> --event-file -`
+  - Use `--event-file -` and pass JSON via stdin.
+
+Fallback (Tier 1)
+- If the CLI is not available or cannot run, you may append directly to the track transcript JSONL.
+
+Non-blocking summary
+- You MAY run `conductor memory summarize --track-id <track_id>` to update `summary.md`.
+- Summary generation must be non-blocking: failures must not prevent continuing work once canonical transcript persistence is satisfied.
+
 ### Phase 1.5: Canonical Plan (Required)
 Each track MUST have a single canonical plan source of truth.
 

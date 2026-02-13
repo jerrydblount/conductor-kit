@@ -54,6 +54,10 @@ When the track is complete:
   - `product.md`: Product vision and goals (project-owned).
   - `tech-stack.md`: Technology stack and constraints (project-owned).
   - `workflow.md`: Development protocols (TDD, checkpoints, commits).
+  - `memory/`: Repo-level Memory configuration (managed).
+    - `config.json`: local DB config + chunking config + remote scaffold.
+    - `docker-compose.yml`: local Postgres (optional; Docker required).
+    - `migrations/`: local DB migrations.
   - `tracks/`: Active and completed tracks.
     - `<track_id>/`
       - `spec.md`: Requirements.
@@ -62,6 +66,11 @@ When the track is complete:
       - `canonical_plan_snapshot.md`: Latest snapshot of the canonical plan.
       - `canonical_plan_snapshots/`: Archived snapshots.
       - `canonical_plan_diffs/`: Archived diffs.
+      - `memory/`: Per-track lossless transcript (canonical).
+        - `transcript.jsonl`: append-only transcript.
+        - `state.json`: cursors + seq.
+        - `summary.md`: optional derived summary.
+        - `artifacts/`: large tool output blobs.
 
 ## Key Files
 - `CONDUCTOR.md`: The master Conductor rule file.

@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "local_db": {
+    "enabled": true,
+    "docker_compose_path": ".conductor/memory/docker-compose.yml",
+    "service_name": "db",
+    "host": "127.0.0.1",
+    "port": 54321,
+    "database": "conductor_memory",
+    "user": "conductor",
+    "password": "conductor"
+  },
+  "chunking": {
+    "enabled": false,
+    "max_chars": 12000,
+    "overlap_chars": 500
+  },
+  "remote_sync": {
+    "enabled": false,
+    "base_url": null,
+    "auth": {
+      "type": "none"
+    }
+  }
+}

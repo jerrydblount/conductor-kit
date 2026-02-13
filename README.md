@@ -75,6 +75,8 @@ This creates:
 - `.conductor/` directory with:
   - `CONDUCTOR.md` (the master rule that guides your AI assistant)
   - `workflow.md`, `CONDUCTOR_README.md`, config files
+  - `.gitignore` (Conductor-local ignores; keeps lossless memory transcripts uncommitted by default)
+  - `memory/` (Conductor Memory config + local DB scaffold)
   - `tracks/` (where track folders will live)
   - `archive/` (used for backups)
   - `product.md` (placeholder — populated by the AI assistant)
@@ -235,6 +237,7 @@ See `CHANGELOG.md` and `UPGRADING.md` for details.
 | `conductor version [path]` | Print installed version |
 | `conductor doctor [path]` | Check installation health |
 | `conductor integrate {warp,cursor,generic} [path]` | Install IDE integration |
+| `conductor memory ...` | Conductor Memory (lossless transcript + optional local DB indexing) |
 
 All commands accept `--dry-run` (print actions without writing) and `--yes` (auto-confirm prompts).
 
