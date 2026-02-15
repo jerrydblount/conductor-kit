@@ -201,25 +201,6 @@ The assistant will sync the canonical plan into the track, regenerate `spec.md` 
 
 ---
 
-## Scenarios
-
-### Solo founder adding auth to a SaaS app
-
-You're building a SaaS product alone, using an AI assistant for most of the coding. You need to add authentication. You say "Start a new track for user authentication," and Conductor interviews you about the requirements: email/password login, OAuth providers, session handling. It writes the spec, generates a phased plan, and you scan it to catch anything missing. During implementation, the agent writes tests first and stops at each phase checkpoint so you can verify the login flow works before it moves on to OAuth.
-
-### Startup team onboarding a new engineer
-
-Your three-person startup just hired a fourth engineer. Instead of a long onboarding call, the new hire reads `.conductor/product.md` (product goals and user personas) and `.conductor/tech-stack.md` (language, framework, database choices). They pick up an existing track that has a spec and plan already written, and start implementing from where the last person left off. The plan shows which tasks are done, which are in progress, and what's next.
-
-### Small company maintaining a legacy service
-
-Your team needs to migrate a legacy service from one database to another. You create a track, write a canonical plan covering the migration steps, and run "scan plan" to catch gaps; the scan flags that you haven't accounted for rollback steps or data validation. You fix the plan, then implement phase by phase with checkpoints after each migration stage.
-
-### Enterprise team with compliance requirements
-
-Your team builds software in a regulated industry. You need records of what the AI assistant did and why. Conductor Memory captures a lossless transcript of every conversation in the track. Plan diffs show exactly what changed between plan versions. Scan reports document what was reviewed before implementation started. These artifacts live in the repo alongside the code.
-
----
 
 ## Upgrading
 
