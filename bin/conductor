@@ -221,11 +221,7 @@ def _install_or_upgrade(
         (".conductor/workflow.md", "workflow"),
     ]
 
-    managed_json_files = [
-        (".conductor/llm_estimator_defaults.json", "config"),
-        (".conductor/llm_pricing.json", "config"),
-        (".conductor/llm_usage_samples.jsonl", "config"),
-    ]
+    managed_json_files = []
 
     changed_any = False
 
@@ -391,10 +387,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     check_exists(conductor_dir / "product.md", "file")
     check_exists(conductor_dir / "tech-stack.md", "file")
 
-    check_exists(conductor_dir / "llm_estimator_defaults.json", "file")
-    check_exists(conductor_dir / "llm_pricing.json", "file")
-    check_exists(conductor_dir / "llm_usage_samples.jsonl", "file")
-
     check_exists(conductor_dir / "conductor_version.json", "file")
     check_exists(repo / "PLAN_AUTOMATION.md", "file")
 
@@ -417,9 +409,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 ".conductor/CONDUCTOR.md",
                 ".conductor/CONDUCTOR_README.md",
                 ".conductor/workflow.md",
-                ".conductor/llm_estimator_defaults.json",
-                ".conductor/llm_pricing.json",
-                ".conductor/llm_usage_samples.jsonl",
                 "PLAN_AUTOMATION.md",
             ]
             for rel in managed:

@@ -17,9 +17,6 @@ Conductor Kit treats these files as Conductor-managed and safe to upgrade:
 - `.conductor/CONDUCTOR.md`
 - `.conductor/CONDUCTOR_README.md`
 - `.conductor/workflow.md`
-- `.conductor/llm_estimator_defaults.json`
-- `.conductor/llm_pricing.json`
-- `.conductor/llm_usage_samples.jsonl`
 - `PLAN_AUTOMATION.md`
 - `.conductor/conductor_version.json`
 

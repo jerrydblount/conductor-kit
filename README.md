@@ -1,71 +1,85 @@
 # Conductor Kit
 
-Conductor Kit is a port of the Gemini CLI extension [Conductor](https://geminicli.com/extensions/?name=gemini-cli-extensionsconductor). This is not a 1:1, rather it's a close recreation with some modifications and additional features. 
-The goal of Conductor Kit is to enable non-Gemini CLI users to benefit from the context-driven approach. 
-Conductor Kit supports Warp, Cursor, or any agentic IDE.
+Conductor Kit is an IDE-agnostic, repo-local toolkit for context-driven agentic development.
 
-Conductor Kit is a repo-local, IDE-agnostic way to run context-driven development:
-- You keep the workflow, product context, and tech constraints in the repo under `.conductor/`.
-- Work is organized into **tracks** (`.conductor/tracks/<track-name>/`) with a `spec.md`, `plan.md`, and `metadata.json`.
-- Plans are captured in a **canonical plan** format (Warp notebook or local markdown) and converted into Conductor tracks.
-- The system produces durable artifacts (snapshots and diffs) so work is auditable and repeatable.
+## What is Conductor Kit
 
-This repository contains:
-- A **template** (`template/`) that gets installed into any target repo.
-- A **CLI** (`bin/conductor`) to install, upgrade, and validate the installation.
-- **IDE integrations** (`integrations/`) for Warp, Cursor, and a generic "AGENTS.md" setup.
+Conductor Kit is a port of the Gemini CLI [Conductor](https://github.com/gemini-cli-extensions/conductor) extension. It is not a 1:1 copy; it is a close recreation with modifications and additional features. The original Conductor extension was built for Gemini CLI only. Conductor Kit takes the same approach and makes it available to Warp, Cursor, and any IDE that supports agent rules files (`AGENTS.md`, `.cursorrules`, or similar).
+
+The original Conductor introduced a simple idea: store your product context, tech stack constraints, and workflow preferences in the repo alongside your code. When your AI assistant starts a task, it reads those files first. Work is organized into tracks (isolated directories for each feature or bug fix) with specs, plans, and implementation checkpoints. The result is that your AI assistant follows a consistent protocol instead of starting fresh every session.
+
+Conductor Kit packages this into a template that gets installed into any repo, a CLI to manage installations, and integration files for different IDEs.
+
+## Who is this for
+
+- **Solopreneurs**: You're building alone with an AI assistant. Conductor Kit keeps your product context and tech decisions in files that persist across sessions, so your assistant doesn't lose track of what you're building or how.
+- **Startups**: Multiple people (or multiple agents) work in the same codebase. The shared context files in `.conductor/` give everyone the same starting point. New team members can read `product.md` and `tech-stack.md` to get oriented.
+- **Small tech companies**: You have an established product and you're adding features. The track/plan/spec workflow gives you a structured way to define work before implementation starts, and phase checkpoints let you verify along the way.
+- **Enterprise product teams**: You need auditable, repeatable workflows. Track artifacts (plan snapshots, diffs, scan reports, memory transcripts) provide a paper trail for every piece of AI-assisted work.
+
+## Features
+
+- **Context-driven development**: Product goals, tech stack constraints, and workflow preferences live in `.conductor/` as markdown files. Your AI assistant reads them before every interaction, so it works with your project's actual constraints instead of guessing.
+
+- **Tracks**: Each feature or bug fix gets its own directory (`.conductor/tracks/<track_id>/`) with a spec, plan, and metadata file. Tracks keep units of work isolated and make progress visible through task status markers.
+
+- **Interview-based specs**: When you start a track, Conductor walks through a structured interview: goal, functional requirements, non-functional requirements, out-of-scope items, and acceptance criteria. The answers are written into a `spec.md` file.
+
+- **Plan generation and phases**: Plans break work into phases and tasks. Each phase ends with a checkpoint where the agent stops and waits for you to verify before continuing.
+
+- **Canonical plan sync**: Plans are grounded in a canonical markdown file. When the canonical plan changes, running "update plan" regenerates the spec and plan while preserving any local overrides you've added. Snapshots and diffs are stored for every sync.
+
+- **Plan scanning**: Before implementation, a read-only scan cross-checks the canonical plan against the spec and plan. It flags conflicts, contradictions, gaps, and ambiguities, grouped by severity: blocker, warning, or suggestion.
+
+- **TDD workflow**: Implementation follows a Red → Green → Refactor cycle defined in `workflow.md`. The agent writes failing tests first, implements just enough to pass, then refactors.
+
+- **Conductor Memory**: Every track records a lossless conversation transcript as append-only JSONL. An optional local Postgres database with full-text search can index transcripts for retrieval. *(The Postgres integration is experimental and has not been fully tested. The JSONL transcript works without it.)*
+
+- **IDE integrations**: Ships with integration templates for Warp (global loader rule), Cursor (`.cursorrules`), and any tool that reads `AGENTS.md`.
+
+- **CLI**: `bin/conductor` handles `init`, `upgrade`, `version`, `doctor`, `integrate`, and `memory` commands. All commands support `--dry-run` and `--yes` flags.
 
 ---
 
 ## Installation
 
-Installing Conductor is a two-part process:
-1. **Part A**: Get the Conductor Kit CLI onto your machine (do this once).
-2. **Part B**: Use that CLI to install Conductor into each project repo you want to use it in.
+Installing Conductor Kit is a two-part process:
+1. **Part A**: Get the Conductor Kit CLI onto your machine (once).
+2. **Part B**: Use the CLI to install Conductor into each project repo.
 
----
+### Part A: install the CLI (once)
 
-### Part A: Install Conductor Kit (the CLI) — do this once
+#### Step 1: Clone the repository
 
-#### Step A1: Clone the conductor-kit repository
-
-Pick a permanent location on your machine. For example:
+Pick a permanent location on your machine:
 
 ```sh
 git clone https://github.com/jerrydblount/conductor-kit.git ~/conductor-kit
 ```
 
-You can choose any path you like; just remember it.
-
-#### Step A2: Verify the CLI runs
+#### Step 2: Verify the CLI runs
 
 ```sh
 python3 ~/conductor-kit/bin/conductor --help
 ```
 
-You should see output like:
+You should see:
 
 ```
 usage: conductor [-h] [--dry-run] [--yes] {init,upgrade,version,doctor,integrate} ...
 ```
 
-If that works, Conductor Kit is installed.
-
----
-
-### Part B: Install Conductor into a project repo
+### Part B: install Conductor into a project repo
 
 Repeat these steps for each repo where you want to use Conductor.
 
-#### Step B1: Run `conductor init`
-
-From anywhere, run:
+#### Step 1: Run `conductor init`
 
 ```sh
 python3 ~/conductor-kit/bin/conductor init /path/to/your-project
 ```
 
-Or, if you are already in the project root:
+Or from inside the project root:
 
 ```sh
 python3 ~/conductor-kit/bin/conductor init .
@@ -73,58 +87,52 @@ python3 ~/conductor-kit/bin/conductor init .
 
 This creates:
 - `.conductor/` directory with:
-  - `CONDUCTOR.md` (the master rule that guides your AI assistant)
-  - `workflow.md`, `CONDUCTOR_README.md`, config files
-  - `tracks/` (where track folders will live)
-  - `archive/` (used for backups)
-  - `product.md` (placeholder — populated by the AI assistant)
-  - `tech-stack.md` (placeholder — populated by the AI assistant)
+  - `CONDUCTOR.md`: the master rule that guides your AI assistant
+  - `workflow.md`: the TDD and checkpoint protocol
+  - `CONDUCTOR_README.md`, config files, `.gitignore`
+  - `memory/`: Conductor Memory config and local DB scaffold
+  - `tracks/`: where track directories will live
+  - `archive/`: for completed/archived tracks
+  - `product.md`: placeholder for product context (populated by the AI assistant)
+  - `tech-stack.md`: placeholder for tech constraints (populated by the AI assistant)
 - `PLAN_AUTOMATION.md` at the repo root
 
-#### Step B2: Add IDE integration (choose one)
+#### Step 2: Add IDE integration
 
-**For Warp (global loader rule — manual setup)**
+Choose one:
 
-Warp uses a single global rule that delegates to the repo-local `.conductor/CONDUCTOR.md`.
+**Warp** (global loader rule, manual setup):
+1. Run `python3 ~/conductor-kit/bin/conductor integrate warp` to see the rule text.
+2. Copy the output.
+3. Paste it into Warp Settings → Rules.
 
-1. Run this to see the rule text:
-   ```sh
-   python3 ~/conductor-kit/bin/conductor integrate warp
-   ```
-2. Copy the printed text.
-3. Paste it into Warp's global rules (Warp Settings → Rules).
+This is a one-time step. If the template changes in future releases, you'll need to re-copy/paste.
 
-Note: This is a one-time manual step. `conductor init` / `conductor upgrade` cannot modify Warp's global rules. If the template changes in future releases, you must re-copy/paste.
-
-**For Cursor (repo-local)**
-
+**Cursor** (repo-local):
 ```sh
 python3 ~/conductor-kit/bin/conductor integrate cursor /path/to/your-project
 ```
+Creates `.cursorrules` in your project.
 
-This creates `.cursorrules` in your project.
-
-**For other IDEs / generic (repo-local)**
-
+**Other IDEs / generic** (repo-local):
 ```sh
 python3 ~/conductor-kit/bin/conductor integrate generic /path/to/your-project
 ```
+Creates `AGENTS.md` in your project.
 
-This creates `AGENTS.md` in your project.
-
-#### Step B3: Verify the installation
+#### Step 3: Verify the installation
 
 ```sh
 python3 ~/conductor-kit/bin/conductor doctor /path/to/your-project
 ```
 
-You should see `OK` for all required files and directories.
+You should see `OK` for all required files.
 
 ```sh
 python3 ~/conductor-kit/bin/conductor version /path/to/your-project
 ```
 
-Shows the installed Conductor version.
+Prints the installed Conductor version.
 
 ---
 
@@ -134,10 +142,12 @@ Conductor is opt-in. It only activates when you explicitly trigger it.
 
 ### Trigger phrases
 
-The assistant will engage Conductor when you say:
+Your AI assistant will engage Conductor when you say:
 - "Start a new track" / "Create conductor track"
 - "Use Conductor"
 - "Update plan" / "Update the plan"
+- "Scan plan" / "Scan the plan"
+- "Save scan report"
 - "Execute plan" / "Execute the plan" / "Implement the plan"
 - Or reference a Conductor artifact (e.g., "Check the spec for track X")
 
@@ -151,38 +161,63 @@ Say: "Start a new track for [Feature Name]"
 
 The assistant will:
 1. Create a track directory (`.conductor/tracks/<track_id>/`)
-2. Ask you to choose a canonical plan source (`warp_notebook` or `local_plan_markdown`)
-3. Interview you to gather requirements (goal, functional/non-functional requirements, out of scope, acceptance criteria)
+2. Ask for the canonical plan markdown file and its content
+3. Interview you to gather requirements (goal, functional requirements, non-functional requirements, out of scope, acceptance criteria)
 4. Generate `spec.md`
 
 #### 2. Plan
 
 Once the spec is ready, the assistant will:
 1. Generate `plan.md` based on the spec and canonical plan
-2. Break down work into phases and tasks
+2. Break work into phases and tasks
 3. Add phase checkpoints for manual verification
-4. Include token/cost estimates
 
-#### 3. Implement
+#### 3. Scan (recommended)
 
-Say: "Execute the plan" or "Implement track <track_id>"
+Before implementation, say: "Scan plan"
+
+The assistant will cross-check the canonical plan against the spec and plan, then produce a scan report with findings grouped by severity (blocker / warning / suggestion). To save the report to the repo, say: "Save scan report".
+
+#### 4. Implement
+
+Say: "Execute the plan" or "Implement track \<track_id\>"
 
 The assistant will:
-1. Follow the TDD workflow (Red → Green → Refactor) defined in `.conductor/workflow.md`
-2. Update `plan.md` task statuses as it progresses (`[ ]` → `[~]` → `[x]`)
-3. Stop at phase checkpoints for you to verify before continuing
+1. Follow the TDD workflow (Red → Green → Refactor) from `workflow.md`
+2. Update task statuses in `plan.md` as it works (`[ ]` → `[~]` → `[x]`)
+3. Stop at phase checkpoints for your verification
 
-#### 4. Finalize
+#### 5. Finalize
 
 When the track is complete:
-1. The assistant may propose updates to `product.md` and `tech-stack.md` if the track changed product scope or introduced new tech
+1. The assistant may propose updates to `product.md` and `tech-stack.md` if the track changed the product scope or introduced new tech
 2. The track can be archived to `.conductor/archive/`
 
 ### Updating a plan
 
-If you modify the canonical plan (Warp notebook or local markdown), say: "Update the plan"
+If you change the canonical plan markdown file, say: "Update the plan"
 
-The assistant will sync the canonical plan into the track, regenerate `spec.md` and `plan.md` (preserving any local overrides), and record a diff.
+The assistant will sync the canonical plan into the track, regenerate `spec.md` and `plan.md` (preserving local overrides), and store a snapshot and diff.
+
+---
+
+## Scenarios
+
+### Solo founder adding auth to a SaaS app
+
+You're building a SaaS product alone, using an AI assistant for most of the coding. You need to add authentication. You say "Start a new track for user authentication," and Conductor interviews you about the requirements: email/password login, OAuth providers, session handling. It writes the spec, generates a phased plan, and you scan it to catch anything missing. During implementation, the agent writes tests first and stops at each phase checkpoint so you can verify the login flow works before it moves on to OAuth.
+
+### Startup team onboarding a new engineer
+
+Your three-person startup just hired a fourth engineer. Instead of a long onboarding call, the new hire reads `.conductor/product.md` (product goals and user personas) and `.conductor/tech-stack.md` (language, framework, database choices). They pick up an existing track that has a spec and plan already written, and start implementing from where the last person left off. The plan shows which tasks are done, which are in progress, and what's next.
+
+### Small company maintaining a legacy service
+
+Your team needs to migrate a legacy service from one database to another. You create a track, write a canonical plan covering the migration steps, and run "scan plan" to catch gaps; the scan flags that you haven't accounted for rollback steps or data validation. You fix the plan, then implement phase by phase with checkpoints after each migration stage.
+
+### Enterprise team with compliance requirements
+
+Your team builds software in a regulated industry. You need records of what the AI assistant did and why. Conductor Memory captures a lossless transcript of every conversation in the track. Plan diffs show exactly what changed between plan versions. Scan reports document what was reviewed before implementation started. These artifacts live in the repo alongside the code.
 
 ---
 
@@ -191,79 +226,57 @@ The assistant will sync the canonical plan into the track, regenerate `spec.md` 
 To upgrade Conductor-managed files in an existing repo:
 
 ```sh
-conductor upgrade /path/to/your-project
+python3 ~/conductor-kit/bin/conductor upgrade /path/to/your-project
 ```
 
-By default:
-- Updates Conductor-managed files
+By default, this:
+- Updates Conductor-managed files (CONDUCTOR.md, CONDUCTOR_README.md, workflow.md, PLAN_AUTOMATION.md)
 - Does NOT overwrite `.conductor/product.md` or `.conductor/tech-stack.md`
 - Never touches `.conductor/tracks/**`
 
-To overwrite project-owned context (shows diff, backs up, asks for confirmation):
+To overwrite project-owned context files (shows diff, backs up, asks for confirmation):
 
 ```sh
-conductor upgrade /path/to/your-project --overwrite-product
-conductor upgrade /path/to/your-project --overwrite-techstack
+python3 ~/conductor-kit/bin/conductor upgrade /path/to/your-project --overwrite-product
+python3 ~/conductor-kit/bin/conductor upgrade /path/to/your-project --overwrite-techstack
 ```
 
-For major version upgrades (breaking changes):
+For major version upgrades with breaking changes:
 
 ```sh
-conductor upgrade /path/to/your-project --accept-breaking
+python3 ~/conductor-kit/bin/conductor upgrade /path/to/your-project --accept-breaking
 ```
 
 See `CHANGELOG.md` and `UPGRADING.md` for details.
 
 ---
 
-## CLI Reference
+## CLI reference
 
-| Command | Description |
-|---------|-------------|
-| `conductor init [path]` | Install Conductor into a repo |
-| `conductor upgrade [path]` | Upgrade Conductor-managed files |
-| `conductor version [path]` | Print installed version |
-| `conductor doctor [path]` | Check installation health |
-| `conductor integrate {warp,cursor,generic} [path]` | Install IDE integration |
+- `conductor init [path]`: Install Conductor into a repo
+- `conductor upgrade [path]`: Upgrade Conductor-managed files
+- `conductor version [path]`: Print installed version
+- `conductor doctor [path]`: Check installation health
+- `conductor integrate {warp,cursor,generic} [path]`: Install IDE integration
+- `conductor memory append`: Append an event to a track's transcript
+- `conductor memory summarize`: Generate a summary of a track's transcript
+- `conductor memory backfill-db`: Backfill transcript events into the local Postgres database
+- `conductor memory db {up,down,status,migrate,psql}`: Manage the local Postgres database
 
 All commands accept `--dry-run` (print actions without writing) and `--yes` (auto-confirm prompts).
 
 ---
 
-## Key Concepts
+## Project status
 
-### Repo-local source of truth
-The `.conductor/` directory is the source of truth for how Conductor operates in a repo.
+Conductor Kit is early. The current version is 0.3.0. The core workflow (context loading, track creation, spec/plan generation, plan scanning, and TDD implementation) works. Some features are still in progress:
 
-### Canonical plan
-Conductor supports two canonical plan sources:
-- `warp_notebook`: a Warp-native plan format (machine-readable in Warp)
-- `local_plan_markdown`: a plain markdown plan (works anywhere)
+- The Postgres database for Conductor Memory is experimental and has not been fully tested. The JSONL transcript (which does not require Postgres) works.
 
-Snapshots and diffs use generic names:
-- `canonical_plan_snapshot.md`
-- `canonical_plan_snapshots/`
-- `canonical_plan_diffs/`
-
-### Managed vs project-owned files
-
-**Conductor-managed** (updated by `conductor upgrade`):
-- `.conductor/CONDUCTOR.md`
-- `.conductor/CONDUCTOR_README.md`
-- `.conductor/workflow.md`
-- `.conductor/llm_*.json` / `.jsonl`
-- `.conductor/conductor_version.json`
-- `PLAN_AUTOMATION.md`
-
-**Project-owned** (NOT overwritten by default):
-- `.conductor/product.md`
-- `.conductor/tech-stack.md`
-- `.conductor/tracks/**`
+If you run into problems or have ideas, open an issue on [GitHub](https://github.com/jerrydblount/conductor-kit/issues). Contributions are welcome; see `CHANGELOG.md` for what's changed so far.
 
 ---
 
-## Notes
+## License
 
-- Conductor is opt-in: integrations only activate when you explicitly request Conductor behavior.
-- Directories like `.conductor/tracks/` and `.conductor/archive/` are created on install (no `.gitkeep` files needed).
-- Warp's global loader rule is manual and must be re-copied if the template changes.
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE) for the full text.
