@@ -17,6 +17,11 @@ Conductor Kit treats these files as Conductor-managed and safe to upgrade:
 - `.conductor/CONDUCTOR.md`
 - `.conductor/CONDUCTOR_README.md`
 - `.conductor/workflow.md`
+- `.conductor/.gitignore`
+- `.conductor/memory/config.json`
+- `.conductor/memory/docker-compose.yml`
+- `.conductor/memory/README.txt`
+- `.conductor/memory/migrations/001_init.sql`
 - `PLAN_AUTOMATION.md`
 - `.conductor/conductor_version.json`
 

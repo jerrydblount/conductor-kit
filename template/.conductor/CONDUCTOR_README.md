@@ -6,7 +6,7 @@ Conductor is a context-driven development framework implemented as repo-local ar
 
 ### 1) Opt-In
 Conductor is opt-in. The agent will only enforce the Conductor workflow when you explicitly ask for it.
-- Trigger phrases include: "Start a new track", "Use Conductor", "Create conductor track", "Update plan", "Execute plan".
+- Trigger phrases include: "Start a new track", "Use Conductor", "Create conductor track", "Update plan", "Scan plan", "Execute plan", "Save scan report".
 
 ### 2) The Workflow
 
@@ -16,7 +16,7 @@ To begin a new feature or bug fix, ask:
 
 The agent will:
 1. Create a new directory in `.conductor/tracks/<track_id>/`.
-2. Ask you to choose a canonical plan source (`warp_notebook` or `local_plan_markdown`).
+2. Ask you for the canonical plan markdown file (default: `.conductor/tracks/<track_id>/canonical_plan.md`) and the canonical plan content.
 3. Interview you to gather requirements.
 4. Generate a `spec.md`.
 
@@ -25,6 +25,14 @@ Once the `spec.md` is approved, the agent will:
 1. Generate a `plan.md` based on the spec and canonical plan.
 2. Break down the work into phases and tasks.
 3. Inject phase checkpoints for manual verification.
+
+#### Step 2.5: Scan (Recommended)
+Before implementation, you can ask:
+> "Scan plan"
+
+The agent will:
+1. Cross-check the canonical plan markdown against `spec.md` and `plan.md`.
+2. Produce a structured scan report (conflicts, contradictions, gaps, and clarification questions).
 
 #### Step 3: Implement
 Ask the agent:
@@ -46,6 +54,10 @@ When the track is complete:
   - `product.md`: Product vision and goals (project-owned).
   - `tech-stack.md`: Technology stack and constraints (project-owned).
   - `workflow.md`: Development protocols (TDD, checkpoints, commits).
+  - `memory/`: Repo-level Memory configuration (managed).
+    - `config.json`: local DB config + chunking config + remote scaffold.
+    - `docker-compose.yml`: local Postgres (optional; Docker required).
+    - `migrations/`: local DB migrations.
   - `tracks/`: Active and completed tracks.
     - `<track_id>/`
       - `spec.md`: Requirements.
@@ -54,6 +66,11 @@ When the track is complete:
       - `canonical_plan_snapshot.md`: Latest snapshot of the canonical plan.
       - `canonical_plan_snapshots/`: Archived snapshots.
       - `canonical_plan_diffs/`: Archived diffs.
+      - `memory/`: Per-track lossless transcript (canonical).
+        - `transcript.jsonl`: append-only transcript.
+        - `state.json`: cursors + seq.
+        - `summary.md`: optional derived summary.
+        - `artifacts/`: large tool output blobs.
 
 ## Key Files
 - `CONDUCTOR.md`: The master Conductor rule file.

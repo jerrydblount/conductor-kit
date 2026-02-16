@@ -3,6 +3,11 @@
 Conductor Kit is an IDE-agnostic, repo-local toolkit for context-driven agentic development.
 
 ## What is Conductor Kit
+Conductor Kit is a repo-local, IDE-agnostic way to run context-driven development:
+- You keep the workflow, product context, and tech constraints in the repo under `.conductor/`.
+- Work is organized into **tracks** (`.conductor/tracks/<track-name>/`) with a `spec.md`, `plan.md`, and `metadata.json`.
+- Plans are captured in a **canonical plan** format (repo-local markdown) and converted into Conductor tracks.
+- The system produces durable artifacts (snapshots and diffs) so work is auditable and repeatable.
 
 Conductor Kit is a port of the Gemini CLI [Conductor](https://github.com/gemini-cli-extensions/conductor) extension. It is not a 1:1 copy; it is a close recreation with modifications and additional features. The original Conductor extension was built for Gemini CLI only. Conductor Kit takes the same approach and makes it available to Warp, Cursor, and any IDE that supports agent rules files (`AGENTS.md`, `.cursorrules`, or similar).
 
@@ -161,8 +166,8 @@ Say: "Start a new track for [Feature Name]"
 
 The assistant will:
 1. Create a track directory (`.conductor/tracks/<track_id>/`)
-2. Ask for the canonical plan markdown file and its content
-3. Interview you to gather requirements (goal, functional requirements, non-functional requirements, out of scope, acceptance criteria)
+2. Ask you for the canonical plan markdown file (default: `.conductor/tracks/<track_id>/canonical_plan.md`) and the canonical plan content
+3. Interview you to gather requirements (goal, functional/non-functional requirements, out of scope, acceptance criteria)
 4. Generate `spec.md`
 
 #### 2. Plan
@@ -198,6 +203,14 @@ When the track is complete:
 If you change the canonical plan markdown file, say: "Update the plan"
 
 The assistant will sync the canonical plan into the track, regenerate `spec.md` and `plan.md` (preserving local overrides), and store a snapshot and diff.
+
+### Scanning a plan (recommended)
+
+Before implementation, say: "Scan plan"
+
+The assistant will cross-check the canonical plan markdown against the track `spec.md` and `plan.md`, then produce a structured scan report highlighting conflicts, contradictions, gaps, and clarification questions.
+
+To save the report to the repo (optional), say: "Save scan report".
 
 ---
 

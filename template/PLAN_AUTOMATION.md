@@ -6,18 +6,17 @@ Conductor treats a track’s **canonical plan** as the source of truth for:
 - `.conductor/tracks/<track_id>/plan.md`
 
 This document defines an automation-first workflow so that:
-- A track’s canonical plan can be chosen (Warp notebook or local markdown).
+- A track’s canonical plan lives as repo-local markdown.
 - A Conductor track can be created and kept in sync with the canonical plan.
 - Changes to the canonical plan are tracked via snapshots + diffs.
 - Conductor artifacts are treated as **GENERATED** (with explicitly preserved **LOCAL OVERRIDES** blocks).
 
 ## Canonical plan sources
-Conductor supports two canonical plan sources:
-- `warp_notebook`: a Warp Drive notebook URL/ID
+Conductor supports one canonical plan source:
 - `local_plan_markdown`: a repo-local markdown file
 
 ## Definitions
-- **Canonical plan**: the designated source of truth for a track (Warp notebook URL/ID or local markdown file path).
+- **Canonical plan**: the designated source of truth for a track (repo-local markdown file path).
 - **Snapshot**: a track-local file `canonical_plan_snapshot.md` containing an exported copy of the canonical plan at a point in time.
 - **Snapshot archive**: timestamped snapshots stored under `canonical_plan_snapshots/` for historical diffing.
 - **Diff archive**: timestamped diffs stored under `canonical_plan_diffs/`.
@@ -29,29 +28,20 @@ The agent recognizes these commands and runs the described workflow.
 
 ### 1) "create plan" / "create a plan"
 Agent behavior:
-- Ask the user which canonical plan source to use:
-  - Warp notebook (`warp_notebook`)
-  - Local markdown (`local_plan_markdown`)
-- If Warp notebook is chosen and a Warp Drive notebook URL is produced/shared, treat it as canonical and derive the notebook ID.
-- If local markdown is chosen, create a canonical plan file path (recommended: `.conductor/tracks/<track_id>/canonical_plan.md`) and ask the user to provide the canonical plan content.
-
-Warp notebook notes:
-- Canonical plan form is a Warp Drive notebook URL like:
-  `https://app.warp.dev/drive/notebook/<title>-<NOTEBOOK_ID>`
-- The notebook ID is the trailing token.
+- Create a repo-local canonical plan markdown file (recommended: `.conductor/tracks/<track_id>/canonical_plan.md`) and ask the user to provide the canonical plan content.
 
 ### 2) "use conductor" / "create conductor track"
 Agent behavior:
 - Ask for the track id (if not provided).
-- Ask for the canonical plan source (`warp_notebook` or `local_plan_markdown`) and capture the appropriate pointer fields.
+- Ask for the canonical plan markdown path (default: `.conductor/tracks/<track_id>/canonical_plan.md`).
 - Create or update `.conductor/tracks/<track_id>/` with:
-  - `metadata.json` including canonical plan identifiers.
+  - `metadata.json` including canonical plan identifiers (`canonical_plan_source: local_plan_markdown`, `canonical_local_plan_path`).
   - `spec.md` and `plan.md` initialized as GENERATED documents with LOCAL OVERRIDES blocks.
   - Canonical plan snapshot artifacts:
     - `canonical_plan_snapshot.md` (initial sync if possible; otherwise placeholder until first `update plan`)
     - `canonical_plan_snapshots/`
     - `canonical_plan_diffs/`
-  - If `local_plan_markdown`: create the canonical plan file (recommended: `canonical_plan.md`) if missing.
+  - Create the canonical plan file if missing.
 
 Guarantee:
 - From this point on, `spec.md` and `plan.md` are treated as **generated** outputs from the canonical plan snapshot.
@@ -61,7 +51,7 @@ Agent behavior (fully automated):
 
 1) Sync canonical plan → snapshot
 - Determine canonical plan source from `.conductor/tracks/<track_id>/metadata.json`:
-  - `canonical_plan_source`: `warp_notebook` | `local_plan_markdown`
+  - `canonical_plan_source`: `local_plan_markdown`
 - Write the new snapshot to:
   - `.conductor/tracks/<track_id>/canonical_plan_snapshot.md`
 - Also write a timestamped copy into:
@@ -81,9 +71,8 @@ Agent behavior (fully automated):
 4) Update metadata
 Update `.conductor/tracks/<track_id>/metadata.json` with:
 - `canonical_plan_source`
-- Pointer fields for the canonical plan source:
-  - If `warp_notebook`: `canonical_warp_plan_url`, `canonical_warp_notebook_id`
-  - If `local_plan_markdown`: `canonical_local_plan_path`
+- Pointer fields:
+  - `canonical_local_plan_path`
 - Snapshot bookkeeping:
   - `canonical_plan_snapshot_path`
   - `canonical_plan_snapshot_generated_at`
@@ -93,11 +82,23 @@ Update `.conductor/tracks/<track_id>/metadata.json` with:
 Hard stop rule:
 - If the snapshot cannot be generated (canonical plan not accessible), the agent must STOP and report what is missing.
 
-### 4) "execute plan" / "execute the plan" / "implement the plan"
+### 4) "scan plan" / "scan the plan"
 Agent behavior:
+- Ask for the track id (if not provided).
+- Read the canonical plan markdown and cross-check it against the track `spec.md` and `plan.md`.
+- Produce a structured scan report in chat (do not write files unless the user asks to "save scan report").
+
+### 5) "execute plan" / "execute the plan" / "implement the plan"
+Agent behavior:
+- Recommend running "scan plan" first (optional but recommended).
 - Read the track `spec.md` + `plan.md`.
 - Implement tasks phase-by-phase per `.conductor/workflow.md`.
 - Stop at checkpoints.
+
+### 6) "save scan report"
+Agent behavior:
+- Save the most recent scan report to `.conductor/tracks/<track_id>/plan_scans/<YYYYMMDD_HHMMSSZ>.md`.
+- If no scan has been run yet, run "scan plan" first, then save.
 
 ## Track file layout (required)
 Each track directory uses this layout:
@@ -108,9 +109,8 @@ Each track directory uses this layout:
 - `.conductor/tracks/<track_id>/canonical_plan_snapshots/`
 - `.conductor/tracks/<track_id>/canonical_plan_diffs/`
 
-Optional (recommended)
-- If `local_plan_markdown`:
-  - `.conductor/tracks/<track_id>/canonical_plan.md`
+Recommended
+- `.conductor/tracks/<track_id>/canonical_plan.md`
 
 ## Generated vs Override blocks (required)
 `spec.md` and `plan.md` must contain both of these blocks:

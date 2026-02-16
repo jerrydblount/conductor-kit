@@ -6,16 +6,32 @@ import argparse
 import datetime as dt
 import difflib
 import json
+import os
 import shutil
+import subprocess
 import sys
+import uuid
 from pathlib import Path
 from typing import Any
+
+import fcntl
 
 
 def _utc_now_iso() -> str:
     return dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat().replace(
         "+00:00", "Z"
     )
+
+
+MEMORY_SCHEMA_VERSION = 1
+
+
+def _which(name: str) -> str | None:
+    return shutil.which(name)
+
+
+def _print_error(msg: str) -> None:
+    print(f"ERROR: {msg}", file=sys.stderr)
 
 
 def _read_text(path: Path) -> str:
@@ -33,6 +49,20 @@ def _read_json(path: Path) -> dict[str, Any]:
 
 def _write_json(path: Path, obj: dict[str, Any]) -> None:
     _write_text(path, json.dumps(obj, indent=2, sort_keys=True) + "\n")
+
+
+def _write_json_atomic(path: Path, obj: dict[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(f"{path.name}.tmp.{os.getpid()}")
+    tmp.write_text(json.dumps(obj, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def _acquire_exclusive_lock(lock_path: Path):
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    f = lock_path.open("a+", encoding="utf-8")
+    fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+    return f
 
 
 def _unified_diff(old: str, new: str, *, fromfile: str, tofile: str) -> str:
@@ -219,9 +249,15 @@ def _install_or_upgrade(
         (".conductor/CONDUCTOR.md", "rule"),
         (".conductor/CONDUCTOR_README.md", "docs"),
         (".conductor/workflow.md", "workflow"),
+        (".conductor/.gitignore", "config"),
+        (".conductor/memory/docker-compose.yml", "config"),
+        (".conductor/memory/README.txt", "docs"),
+        (".conductor/memory/migrations/001_init.sql", "migrate"),
     ]
 
-    managed_json_files = []
+    managed_json_files = [
+        (".conductor/memory/config.json", "config"),
+    ]
 
     changed_any = False
 
@@ -386,6 +422,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     check_exists(conductor_dir / "workflow.md", "file")
     check_exists(conductor_dir / "product.md", "file")
     check_exists(conductor_dir / "tech-stack.md", "file")
+    check_exists(conductor_dir / ".gitignore", "file")
+
+
+    # Conductor Memory templates
+    check_exists(conductor_dir / "memory", "dir")
+    check_exists(conductor_dir / "memory" / "config.json", "file")
+    check_exists(conductor_dir / "memory" / "docker-compose.yml", "file")
+    check_exists(conductor_dir / "memory" / "README.txt", "file")
+    check_exists(conductor_dir / "memory" / "migrations", "dir")
+    check_exists(conductor_dir / "memory" / "migrations" / "001_init.sql", "file")
 
     check_exists(conductor_dir / "conductor_version.json", "file")
     check_exists(repo / "PLAN_AUTOMATION.md", "file")
@@ -409,6 +455,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 ".conductor/CONDUCTOR.md",
                 ".conductor/CONDUCTOR_README.md",
                 ".conductor/workflow.md",
+                ".conductor/.gitignore",
+                ".conductor/memory/config.json",
+                ".conductor/memory/docker-compose.yml",
+                ".conductor/memory/README.txt",
+                ".conductor/memory/migrations/001_init.sql",
                 "PLAN_AUTOMATION.md",
             ]
             for rel in managed:
@@ -421,6 +472,45 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             print(
                 "INFO   drift check skipped (installed version differs from this conductor-kit)"
             )
+
+    # Memory dependency hints (advisory; does not affect exit code)
+    mem_cfg = conductor_dir / "memory" / "config.json"
+    if mem_cfg.exists():
+        if _which("docker") is None:
+            print("INFO   memory_db: docker_installed=false")
+            print(_docker_dependency_instructions())
+        else:
+            # Best-effort reachability check.
+            compose_path = conductor_dir / "memory" / "docker-compose.yml"
+            reachable = False
+            try:
+                p = subprocess.run(
+                    [
+                        "docker",
+                        "compose",
+                        "-f",
+                        str(compose_path),
+                        "exec",
+                        "-T",
+                        "db",
+                        "pg_isready",
+                        "-U",
+                        "conductor",
+                        "-d",
+                        "conductor_memory",
+                    ],
+                    check=False,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                reachable = p.returncode == 0
+            except Exception:
+                reachable = False
+
+            print(f"INFO   memory_db: reachable={'true' if reachable else 'false'}")
+            if not reachable:
+                print("INFO   memory_db: next=conductor memory db up")
+                print("INFO   memory_db: next=conductor memory db migrate")
 
     return 0 if ok else 1
 
@@ -455,6 +545,701 @@ def cmd_integrate(args: argparse.Namespace) -> int:
 
     print(f"ERROR: Unknown integration kind: {kind}")
     return 2
+
+
+def _memory_track_dir(repo_root: Path, track_id: str) -> Path:
+    return repo_root / ".conductor" / "tracks" / track_id
+
+
+def _memory_dir(repo_root: Path, track_id: str) -> Path:
+    return _memory_track_dir(repo_root, track_id) / "memory"
+
+
+def _memory_transcript_path(repo_root: Path, track_id: str) -> Path:
+    return _memory_dir(repo_root, track_id) / "transcript.jsonl"
+
+
+def _memory_state_path(repo_root: Path, track_id: str) -> Path:
+    return _memory_dir(repo_root, track_id) / "state.json"
+
+
+def _memory_lock_path(repo_root: Path, track_id: str) -> Path:
+    return _memory_dir(repo_root, track_id) / "transcript.lock"
+
+
+def _memory_default_state() -> dict[str, Any]:
+    return {
+        "schema_version": MEMORY_SCHEMA_VERSION,
+        "next_seq": 1,
+        "last_ingested_seq": 0,
+        "last_summarized_seq": 0,
+        "last_chunked_seq": 0,
+        "remote_last_synced_seq": 0,
+    }
+
+
+def _memory_read_last_seq(transcript_path: Path) -> int:
+    if not transcript_path.exists():
+        return 0
+    try:
+        for line in reversed(transcript_path.read_text(encoding="utf-8").splitlines()):
+            if not line.strip():
+                continue
+            obj = json.loads(line)
+            seq = obj.get("seq")
+            if isinstance(seq, int) and seq >= 0:
+                return seq
+    except Exception:
+        return 0
+    return 0
+
+
+def _memory_load_state(state_path: Path, transcript_path: Path) -> dict[str, Any]:
+    state = _memory_default_state()
+    if state_path.exists():
+        try:
+            loaded = _read_json(state_path)
+            if isinstance(loaded, dict):
+                state.update(loaded)
+        except Exception:
+            pass
+
+    if state.get("schema_version") != MEMORY_SCHEMA_VERSION:
+        state = _memory_default_state()
+
+    last_seq = _memory_read_last_seq(transcript_path)
+    next_seq = state.get("next_seq")
+    if not isinstance(next_seq, int) or next_seq < 1:
+        next_seq = 1
+    if next_seq <= last_seq:
+        next_seq = last_seq + 1
+    state["next_seq"] = next_seq
+
+    return state
+
+
+def _memory_default_sync_policy(event_type: str) -> str:
+    return "sync_ok" if event_type == "message" else "local_only"
+
+
+def _memory_read_event_payload(event_file: str) -> dict[str, Any]:
+    if event_file == "-":
+        raw = sys.stdin.read()
+    else:
+        raw = _read_text(Path(event_file))
+    try:
+        payload = json.loads(raw)
+    except Exception as e:
+        raise ValueError(f"Invalid JSON: {e}")
+    if not isinstance(payload, dict):
+        raise ValueError("Event JSON must be an object")
+    return payload
+
+
+def _memory_validate_event(payload: dict[str, Any]) -> None:
+    event_type = payload.get("event_type")
+    if event_type not in {"message", "tool_call", "tool_result", "artifact", "note"}:
+        raise ValueError("event_type must be one of: message, tool_call, tool_result, artifact, note")
+
+    if event_type == "message":
+        role = payload.get("role")
+        if role not in {"user", "assistant", "system"}:
+            raise ValueError("message.role must be one of: user, assistant, system")
+        content = payload.get("content")
+        if not isinstance(content, dict):
+            raise ValueError("message.content must be an object")
+        if content.get("format") != "text":
+            raise ValueError("message.content.format must be 'text'")
+        if not isinstance(content.get("text"), str):
+            raise ValueError("message.content.text must be a string")
+
+
+def _memory_persist_event(
+    *,
+    repo_root: Path,
+    track_id: str,
+    payload: dict[str, Any],
+    ide: str,
+    agent_name: str | None,
+    session_id: str | None,
+) -> tuple[int, str]:
+    track_dir = _memory_track_dir(repo_root, track_id)
+    if not track_dir.exists():
+        return 12, f"Missing track directory: {track_dir}"
+
+    transcript_path = _memory_transcript_path(repo_root, track_id)
+    state_path = _memory_state_path(repo_root, track_id)
+    lock_path = _memory_lock_path(repo_root, track_id)
+
+    _memory_validate_event(payload)
+
+    # Ensure dirs
+    transcript_path.parent.mkdir(parents=True, exist_ok=True)
+    (transcript_path.parent / "artifacts").mkdir(parents=True, exist_ok=True)
+
+    with _acquire_exclusive_lock(lock_path):
+        state = _memory_load_state(state_path, transcript_path)
+        seq = int(state["next_seq"])
+
+        event_type = str(payload.get("event_type"))
+
+        persisted: dict[str, Any] = dict(payload)
+        persisted.setdefault("schema_version", MEMORY_SCHEMA_VERSION)
+        persisted.setdefault("event_id", str(uuid.uuid4()))
+        persisted["track_id"] = track_id
+        persisted["seq"] = seq
+        persisted.setdefault("ts", _utc_now_iso())
+
+        if "source" not in persisted or not isinstance(persisted.get("source"), dict):
+            source: dict[str, Any] = {"ide": ide}
+            if agent_name:
+                source["agent_name"] = agent_name
+            if session_id:
+                source["session_id"] = session_id
+            persisted["source"] = source
+
+        if "sync" not in persisted or not isinstance(persisted.get("sync"), dict):
+            persisted["sync"] = {
+                "policy": _memory_default_sync_policy(event_type),
+                "redactions_applied": False,
+                "contains_sensitive": False,
+            }
+        else:
+            persisted["sync"].setdefault("policy", _memory_default_sync_policy(event_type))
+            persisted["sync"].setdefault("redactions_applied", False)
+            persisted["sync"].setdefault("contains_sensitive", False)
+
+        line = json.dumps(persisted, ensure_ascii=False)
+        with transcript_path.open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+
+        state["next_seq"] = seq + 1
+        _write_json_atomic(state_path, state)
+
+    return 0, f"OK memory append track_id={track_id} seq={seq} event_id={persisted['event_id']} file={transcript_path}"
+
+
+def cmd_memory_append(args: argparse.Namespace) -> int:
+    try:
+        payload = _memory_read_event_payload(args.event_file)
+    except ValueError as e:
+        _print_error(str(e))
+        return 11
+    except Exception as e:
+        _print_error(f"Failed to read event payload: {e}")
+        return 11
+
+    try:
+        rc, msg = _memory_persist_event(
+            repo_root=args.repo_root.resolve(),
+            track_id=args.track_id,
+            payload=payload,
+            ide=args.ide,
+            agent_name=args.agent_name,
+            session_id=args.session_id,
+        )
+    except ValueError as e:
+        _print_error(str(e))
+        return 11
+    except Exception as e:
+        _print_error(f"Failed to append memory event: {e}")
+        return 10
+
+    if rc != 0:
+        _print_error(msg)
+        return rc
+
+    print(msg)
+    return 0
+
+
+def _docker_dependency_instructions() -> str:
+    lines = [
+        "Docker is required for Conductor memory DB.",
+        "\nInstall Docker Desktop (or Docker Engine) and ensure it is running.",
+        "\nVerify:",
+        "  docker version",
+        "  docker compose version",
+        "\nThen run:",
+        "  conductor memory db up",
+    ]
+    return "\n".join(lines)
+
+
+def _require_docker() -> bool:
+    if _which("docker") is None:
+        _print_error(_docker_dependency_instructions())
+        return False
+    return True
+
+
+def _memory_compose_path(repo_root: Path) -> Path:
+    return repo_root / ".conductor" / "memory" / "docker-compose.yml"
+
+
+def cmd_memory_db_up(args: argparse.Namespace) -> int:
+    if not _require_docker():
+        return 20
+
+    compose_path = _memory_compose_path(args.repo_root.resolve())
+    if not compose_path.exists():
+        _print_error(f"Missing compose file: {compose_path} (run 'conductor init' in this repo)")
+        return 1
+
+    try:
+        subprocess.run(
+            ["docker", "compose", "-f", str(compose_path), "up", "-d"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        _print_error(f"Failed to start DB with Docker: {e}\n\n{_docker_dependency_instructions()}")
+        return 21
+
+    print("OK memory db up")
+    return 0
+
+
+def cmd_memory_db_down(args: argparse.Namespace) -> int:
+    if not _require_docker():
+        return 20
+
+    compose_path = _memory_compose_path(args.repo_root.resolve())
+    if not compose_path.exists():
+        _print_error(f"Missing compose file: {compose_path} (run 'conductor init' in this repo)")
+        return 1
+
+    try:
+        subprocess.run(
+            ["docker", "compose", "-f", str(compose_path), "down"],
+            check=True,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as e:
+        _print_error(
+            f"Failed to stop DB with Docker: {e.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+        return 21
+    except Exception as e:
+        _print_error(f"Failed to stop DB with Docker: {e}")
+        return 21
+
+    print("OK memory db down")
+    return 0
+
+
+def cmd_memory_db_status(args: argparse.Namespace) -> int:
+    if not _require_docker():
+        return 20
+
+    compose_path = _memory_compose_path(args.repo_root.resolve())
+    if not compose_path.exists():
+        _print_error(f"Missing compose file: {compose_path} (run 'conductor init' in this repo)")
+        return 1
+
+    reachable = False
+    try:
+        p = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                str(compose_path),
+                "exec",
+                "-T",
+                "db",
+                "pg_isready",
+                "-U",
+                "conductor",
+                "-d",
+                "conductor_memory",
+            ],
+            check=False,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        reachable = p.returncode == 0
+    except Exception:
+        reachable = False
+
+    print(f"OK memory db status reachable={'true' if reachable else 'false'}")
+    return 0 if reachable else 1
+
+
+def cmd_memory_db_psql(args: argparse.Namespace) -> int:
+    if not _require_docker():
+        return 20
+
+    compose_path = _memory_compose_path(args.repo_root.resolve())
+    if not compose_path.exists():
+        _print_error(f"Missing compose file: {compose_path} (run 'conductor init' in this repo)")
+        return 1
+
+    # Interactive psql session inside the container.
+    try:
+        subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                str(compose_path),
+                "exec",
+                "db",
+                "psql",
+                "-U",
+                "conductor",
+                "-d",
+                "conductor_memory",
+            ],
+            check=False,
+        )
+    except Exception as e:
+        _print_error(f"Failed to open psql: {e}")
+        return 21
+
+    return 0
+
+
+def cmd_memory_db_migrate(args: argparse.Namespace) -> int:
+    if not _require_docker():
+        return 20
+
+    repo_root = args.repo_root.resolve()
+    compose_path = _memory_compose_path(repo_root)
+    if not compose_path.exists():
+        _print_error(f"Missing compose file: {compose_path} (run 'conductor init' in this repo)")
+        return 1
+
+    migrations_dir = repo_root / ".conductor" / "memory" / "migrations"
+    if not migrations_dir.exists():
+        _print_error(f"Missing migrations directory: {migrations_dir}")
+        return 1
+
+    migration_files = sorted(p for p in migrations_dir.glob("*.sql") if p.is_file())
+    if not migration_files:
+        print("OK memory db migrate (no migrations)")
+        return 0
+
+    # Apply migrations via psql inside the container.
+    # Requires: DB is running (user can run `conductor memory db up` first).
+    for mf in migration_files:
+        try:
+            subprocess.run(
+                [
+                    "docker",
+                    "compose",
+                    "-f",
+                    str(compose_path),
+                    "exec",
+                    "-T",
+                    "db",
+                    "psql",
+                    "-U",
+                    "conductor",
+                    "-d",
+                    "conductor_memory",
+                    "-v",
+                    "ON_ERROR_STOP=1",
+                ],
+                check=True,
+                input=mf.read_bytes(),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+            )
+        except subprocess.CalledProcessError as e:
+            _print_error(
+                f"DB migration failed for {mf.name}: {e.stderr.decode('utf-8', errors='replace').strip()}"
+            )
+            return 22
+        except Exception as e:
+            _print_error(f"DB migration failed for {mf.name}: {e}")
+            return 22
+
+    print("OK memory db migrate")
+    return 0
+
+
+def cmd_memory_sync(args: argparse.Namespace) -> int:
+    print("Remote sync not configured")
+    return 0
+
+
+def _sql_quote(value: str) -> str:
+    return "'" + value.replace("'", "''") + "'"
+
+
+def cmd_memory_backfill_db(args: argparse.Namespace) -> int:
+    if not _require_docker():
+        return 20
+
+    repo_root = args.repo_root.resolve()
+    track_id = args.track_id
+    track_dir = _memory_track_dir(repo_root, track_id)
+    if not track_dir.exists():
+        _print_error(f"Missing track directory: {track_dir}")
+        return 12
+
+    compose_path = _memory_compose_path(repo_root)
+    if not compose_path.exists():
+        _print_error(f"Missing compose file: {compose_path} (run 'conductor init' in this repo)")
+        return 1
+
+    transcript_path = _memory_transcript_path(repo_root, track_id)
+    if not transcript_path.exists():
+        print(f"OK memory backfill-db track_id={track_id} ingested_seqs=none inserted=0 skipped=0")
+        return 0
+
+    state_path = _memory_state_path(repo_root, track_id)
+    state = _memory_load_state(state_path, transcript_path)
+    last_ingested = int(state.get("last_ingested_seq") or 0)
+
+    # Optional auto-start + migrate.
+    if not getattr(args, "no_auto_start_db", False):
+        try:
+            subprocess.run(
+                ["docker", "compose", "-f", str(compose_path), "up", "-d"],
+                check=True,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+        except Exception as e:
+            _print_error(f"Failed to start DB with Docker: {e}\n\n{_docker_dependency_instructions()}")
+            return 21
+
+        migrate_rc = cmd_memory_db_migrate(argparse.Namespace(repo_root=repo_root))
+        if migrate_rc != 0:
+            return migrate_rc
+
+    # Build SQL script to ingest new events.
+    to_ingest: list[dict[str, Any]] = []
+    try:
+        for raw in transcript_path.read_text(encoding="utf-8").splitlines():
+            if not raw.strip():
+                continue
+            evt = json.loads(raw)
+            if not isinstance(evt, dict):
+                continue
+            seq = evt.get("seq")
+            if not isinstance(seq, int) or seq <= last_ingested:
+                continue
+            to_ingest.append(evt)
+    except Exception as e:
+        _print_error(f"Failed to read transcript: {e}")
+        return 23
+
+    if not to_ingest:
+        print(f"OK memory backfill-db track_id={track_id} ingested_seqs=none inserted=0 skipped=0")
+        return 0
+
+    to_ingest.sort(key=lambda e: int(e.get("seq") or 0))
+    seq_start = int(to_ingest[0].get("seq"))
+    seq_end = int(to_ingest[-1].get("seq"))
+
+    stmts: list[str] = []
+    stmts.append("BEGIN;")
+    stmts.append(
+        "INSERT INTO conductor_memory.tracks(track_id) VALUES ("
+        + _sql_quote(track_id)
+        + ") ON CONFLICT (track_id) DO UPDATE SET updated_at=now();"
+    )
+
+    for evt in to_ingest:
+        seq = int(evt.get("seq"))
+        event_id = str(evt.get("event_id") or "")
+        ts = str(evt.get("ts") or "")
+        event_type = str(evt.get("event_type") or "")
+        role = evt.get("role")
+        role_s = str(role) if role is not None else ""
+
+        content_text = None
+        if event_type == "message":
+            content = evt.get("content")
+            if isinstance(content, dict):
+                t = content.get("text")
+                if isinstance(t, str):
+                    content_text = t
+
+        sync = evt.get("sync")
+        sync_policy = "sync_ok"
+        contains_sensitive = False
+        redactions_applied = False
+        if isinstance(sync, dict):
+            p = sync.get("policy")
+            if isinstance(p, str):
+                sync_policy = p
+            cs = sync.get("contains_sensitive")
+            if isinstance(cs, bool):
+                contains_sensitive = cs
+            ra = sync.get("redactions_applied")
+            if isinstance(ra, bool):
+                redactions_applied = ra
+
+        payload_json = json.dumps(evt, ensure_ascii=False)
+
+        stmt = (
+            "INSERT INTO conductor_memory.events("
+            "track_id, seq, event_id, ts, event_type, role, content_text, payload_json, sync_policy, contains_sensitive, redactions_applied"
+            ") VALUES ("
+            + ", ".join(
+                [
+                    _sql_quote(track_id),
+                    str(seq),
+                    _sql_quote(event_id),
+                    _sql_quote(ts),
+                    _sql_quote(event_type),
+                    _sql_quote(role_s) if role_s else "NULL",
+                    _sql_quote(content_text) if content_text is not None else "NULL",
+                    _sql_quote(payload_json) + "::jsonb",
+                    _sql_quote(sync_policy),
+                    "true" if contains_sensitive else "false",
+                    "true" if redactions_applied else "false",
+                ]
+            )
+            + ") ON CONFLICT (track_id, seq) DO NOTHING;"
+        )
+        stmts.append(stmt)
+
+    stmts.append("COMMIT;")
+    sql_script = "\n".join(stmts) + "\n"
+
+    try:
+        subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-f",
+                str(compose_path),
+                "exec",
+                "-T",
+                "db",
+                "psql",
+                "-U",
+                "conductor",
+                "-d",
+                "conductor_memory",
+                "-v",
+                "ON_ERROR_STOP=1",
+            ],
+            check=True,
+            input=sql_script.encode("utf-8"),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
+        )
+    except subprocess.CalledProcessError as e:
+        _print_error(
+            f"DB ingest failed: {e.stderr.decode('utf-8', errors='replace').strip()}"
+        )
+        return 23
+    except Exception as e:
+        _print_error(f"DB ingest failed: {e}")
+        return 23
+
+    # Update ingestion cursor.
+    state["last_ingested_seq"] = seq_end
+    _write_json_atomic(state_path, state)
+
+    print(
+        f"OK memory backfill-db track_id={track_id} ingested_seqs={seq_start}-{seq_end} inserted={len(to_ingest)} skipped=0"
+    )
+    return 0
+
+
+def _extract_generated_block(text: str) -> tuple[str, str, str] | None:
+    begin = "<!-- BEGIN GENERATED -->"
+    end = "<!-- END GENERATED -->"
+    i = text.find(begin)
+    j = text.find(end)
+    if i == -1 or j == -1 or j < i:
+        return None
+    pre = text[: i + len(begin)]
+    mid = text[i + len(begin) : j]
+    post = text[j:]
+    return pre, mid, post
+
+
+def _replace_generated_block(text: str, new_block_body: str) -> str:
+    parts = _extract_generated_block(text)
+    if parts is None:
+        # Create a fresh summary skeleton.
+        return (
+            "# Conductor Memory Summary\n\n"
+            "<!-- BEGIN GENERATED -->\n"
+            f"{new_block_body}"
+            "<!-- END GENERATED -->\n\n"
+            "<!-- BEGIN LOCAL OVERRIDES -->\n"
+            "<!-- END LOCAL OVERRIDES -->\n"
+        )
+
+    pre, _mid, post = parts
+    # Ensure body ends with newline for clean formatting.
+    if new_block_body and not new_block_body.endswith("\n"):
+        new_block_body += "\n"
+    return f"{pre}\n{new_block_body}{post}"
+
+
+def cmd_memory_summarize(args: argparse.Namespace) -> int:
+    repo_root = args.repo_root.resolve()
+    track_id = args.track_id
+
+    track_dir = _memory_track_dir(repo_root, track_id)
+    if not track_dir.exists():
+        _print_error(f"Missing track directory: {track_dir}")
+        return 12
+
+    transcript_path = _memory_transcript_path(repo_root, track_id)
+    if not transcript_path.exists():
+        _print_error(f"Missing transcript: {transcript_path}")
+        return 24
+
+    mem_dir = _memory_dir(repo_root, track_id)
+    summary_path = mem_dir / "summary.md"
+    state_path = _memory_state_path(repo_root, track_id)
+
+    # Deterministic MVP summary: include all message event text in seq order.
+    lines: list[str] = []
+    last_seq = 0
+    try:
+        for raw in transcript_path.read_text(encoding="utf-8").splitlines():
+            if not raw.strip():
+                continue
+            evt = json.loads(raw)
+            seq = evt.get("seq")
+            if isinstance(seq, int):
+                last_seq = max(last_seq, seq)
+            if evt.get("event_type") != "message":
+                continue
+            role = evt.get("role")
+            content = evt.get("content") or {}
+            if not isinstance(content, dict):
+                continue
+            text = content.get("text")
+            if not isinstance(text, str):
+                continue
+            lines.append(f"- seq={seq} role={role}: {text}")
+    except Exception as e:
+        _print_error(f"Failed to summarize transcript: {e}")
+        return 24
+
+    body = "\n".join(lines) + ("\n" if lines else "")
+
+    existing = summary_path.read_text(encoding="utf-8") if summary_path.exists() else ""
+    updated = _replace_generated_block(existing, body)
+    _write_text(summary_path, updated)
+
+    # Update state cursor best-effort.
+    try:
+        state = _memory_load_state(state_path, transcript_path)
+        state["last_summarized_seq"] = last_seq
+        _write_json_atomic(state_path, state)
+    except Exception:
+        pass
+
+    print(f"OK memory summarize track_id={track_id} summarized_to_seq={last_seq}")
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -517,6 +1302,102 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sp_integrate.add_argument("path", nargs="?", default=Path("."), type=Path)
     sp_integrate.set_defaults(func=cmd_integrate)
+
+    # Memory commands
+    sp_memory = sub.add_parser(
+        "memory", parents=[common], help="Conductor Memory (transcripts, indexing, sync)"
+    )
+    mem_sub = sp_memory.add_subparsers(dest="memory_cmd", required=True)
+
+    sp_mem_append = mem_sub.add_parser(
+        "append", parents=[common], help="Append a single event to a track transcript"
+    )
+    sp_mem_append.add_argument(
+        "--repo-root", default=Path("."), type=Path, help="Repo root (default: .)"
+    )
+    sp_mem_append.add_argument("--track-id", required=True)
+    sp_mem_append.add_argument(
+        "--event-file",
+        required=True,
+        help="Path to event JSON file, or '-' to read JSON from stdin",
+    )
+    sp_mem_append.add_argument(
+        "--ide", choices=["warp", "cursor", "generic"], default="generic"
+    )
+    sp_mem_append.add_argument("--agent-name")
+    sp_mem_append.add_argument("--session-id")
+    sp_mem_append.set_defaults(func=cmd_memory_append)
+
+    sp_mem_sync = mem_sub.add_parser(
+        "sync", parents=[common], help="Sync memory to remote (stub)"
+    )
+    sp_mem_sync.set_defaults(func=cmd_memory_sync)
+
+    sp_mem_backfill = mem_sub.add_parser(
+        "backfill-db", parents=[common], help="Index transcript JSONL into local Postgres"
+    )
+    sp_mem_backfill.add_argument(
+        "--repo-root", default=Path("."), type=Path, help="Repo root (default: .)"
+    )
+    sp_mem_backfill.add_argument("--track-id", required=True)
+    sp_mem_backfill.add_argument(
+        "--no-auto-start-db",
+        action="store_true",
+        help="Do not attempt to start/migrate the local DB automatically",
+    )
+    sp_mem_backfill.set_defaults(func=cmd_memory_backfill_db)
+
+    sp_mem_summarize = mem_sub.add_parser(
+        "summarize", parents=[common], help="Create/update track memory summary"
+    )
+    sp_mem_summarize.add_argument(
+        "--repo-root", default=Path("."), type=Path, help="Repo root (default: .)"
+    )
+    sp_mem_summarize.add_argument("--track-id", required=True)
+    sp_mem_summarize.set_defaults(func=cmd_memory_summarize)
+
+    sp_mem_db = mem_sub.add_parser("db", parents=[common], help="Local memory DB helpers")
+    db_sub = sp_mem_db.add_subparsers(dest="db_cmd", required=True)
+
+    sp_mem_db_up = db_sub.add_parser(
+        "up", parents=[common], help="Start local Postgres for Conductor Memory"
+    )
+    sp_mem_db_up.add_argument(
+        "--repo-root", default=Path("."), type=Path, help="Repo root (default: .)"
+    )
+    sp_mem_db_up.set_defaults(func=cmd_memory_db_up)
+
+    sp_mem_db_down = db_sub.add_parser(
+        "down", parents=[common], help="Stop local Postgres for Conductor Memory"
+    )
+    sp_mem_db_down.add_argument(
+        "--repo-root", default=Path("."), type=Path, help="Repo root (default: .)"
+    )
+    sp_mem_db_down.set_defaults(func=cmd_memory_db_down)
+
+    sp_mem_db_status = db_sub.add_parser(
+        "status", parents=[common], help="Check local DB reachability"
+    )
+    sp_mem_db_status.add_argument(
+        "--repo-root", default=Path("."), type=Path, help="Repo root (default: .)"
+    )
+    sp_mem_db_status.set_defaults(func=cmd_memory_db_status)
+
+    sp_mem_db_migrate = db_sub.add_parser(
+        "migrate", parents=[common], help="Apply local DB migrations"
+    )
+    sp_mem_db_migrate.add_argument(
+        "--repo-root", default=Path("."), type=Path, help="Repo root (default: .)"
+    )
+    sp_mem_db_migrate.set_defaults(func=cmd_memory_db_migrate)
+
+    sp_mem_db_psql = db_sub.add_parser(
+        "psql", parents=[common], help="Open an interactive psql session in the DB container"
+    )
+    sp_mem_db_psql.add_argument(
+        "--repo-root", default=Path("."), type=Path, help="Repo root (default: .)"
+    )
+    sp_mem_db_psql.set_defaults(func=cmd_memory_db_psql)
 
     return p
 
