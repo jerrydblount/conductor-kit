@@ -256,9 +256,6 @@ def _install_or_upgrade(
     ]
 
     managed_json_files = [
-        (".conductor/llm_estimator_defaults.json", "config"),
-        (".conductor/llm_pricing.json", "config"),
-        (".conductor/llm_usage_samples.jsonl", "config"),
         (".conductor/memory/config.json", "config"),
     ]
 
@@ -427,9 +424,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     check_exists(conductor_dir / "tech-stack.md", "file")
     check_exists(conductor_dir / ".gitignore", "file")
 
-    check_exists(conductor_dir / "llm_estimator_defaults.json", "file")
-    check_exists(conductor_dir / "llm_pricing.json", "file")
-    check_exists(conductor_dir / "llm_usage_samples.jsonl", "file")
 
     # Conductor Memory templates
     check_exists(conductor_dir / "memory", "dir")
@@ -462,9 +456,6 @@ def cmd_doctor(args: argparse.Namespace) -> int:
                 ".conductor/CONDUCTOR_README.md",
                 ".conductor/workflow.md",
                 ".conductor/.gitignore",
-                ".conductor/llm_estimator_defaults.json",
-                ".conductor/llm_pricing.json",
-                ".conductor/llm_usage_samples.jsonl",
                 ".conductor/memory/config.json",
                 ".conductor/memory/docker-compose.yml",
                 ".conductor/memory/README.txt",

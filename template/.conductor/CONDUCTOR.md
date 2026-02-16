@@ -71,26 +71,11 @@ Rules
   - `canonical_plan_source`: `local_plan_markdown`
   - `canonical_local_plan_path` (e.g., `.conductor/tracks/<track_id>/canonical_plan.md`)
 - Each track MUST maintain diffable snapshots of the canonical plan:
-  - `.conductor/tracks/<track_id>/canonical_plan_snapshot.md`
-  - `.conductor/tracks/<track_id>/canonical_plan_snapshots/`
-  - `.conductor/tracks/<track_id>/canonical_plan_diffs/`
-  - Reference: `PLAN_AUTOMATION.md`.
-
-### Phase 1.6: Token + Cost Estimation (Plan Budgeting)
-When generating or updating `.conductor/tracks/<track_id>/plan.md`, you MUST include a **Token & Cost Estimate (Generated)** section near the top of the GENERATED block.
-
-Inputs
-- Estimator defaults (for raw token estimates): `.conductor/llm_estimator_defaults.json`
-- Pricing (required for USD estimates): `.conductor/llm_pricing.json`
-- Calibration samples (optional): `.conductor/llm_usage_samples.jsonl`
-  - One JSON object per line (blank lines allowed).
-
-Rules
-- Raw token estimates must always be produced.
-- USD estimates must be **blocked** (but raw tokens still shown) if pricing is missing or does not include the requested provider/model.
-- Cache-aware USD must always include a scenario range at cache_hit_rate = **0.0 / 0.5 / 1.0**.
-- If `.conductor/llm_usage_samples.jsonl` contains usable samples, prefer calibrated per-provider/model medians (and optionally 25/75th percentiles) when updating `.conductor/llm_estimator_defaults.json`.
-- Do not overwrite LOCAL OVERRIDES when inserting/updating the estimate.
+- `.conductor/tracks/<track_id>/canonical_plan_snapshot.md`
+- `.conductor/tracks/<track_id>/canonical_plan_snapshots/`
+- `.conductor/tracks/<track_id>/canonical_plan_diffs/`
+- Reference: `PLAN_AUTOMATION.md`.
+- Backward compatibility: older tracks may use `warp_plan_snapshot.md` / `warp_plan_snapshots/` / `warp_plan_diffs/`. Tooling should support both naming schemes.
 
 ### Phase 2: Track Management
 
@@ -114,7 +99,6 @@ Rules
 4.  **Generate Spec:** Write the answers into `.conductor/tracks/<track_id>/spec.md`.
 5.  **Generate Plan:** create `.conductor/tracks/<track_id>/plan.md`.
     - Break down into **Phases** and **Tasks**.
-    - Add / update the **Token & Cost Estimate (Generated)** section (see Phase 1.6).
     - **CRITICAL:** Inject a **Phase Checkpoint Task** at the end of each Phase (See Workflow).
     - **CRITICAL:** Phase 0 MUST include a “Canonical plan parity” task template (See Workflow).
 
@@ -137,7 +121,6 @@ When the user asks to "update plan", you MUST:
    - Write a timestamped diff to `canonical_plan_diffs/`
 3. Regenerate Conductor artifacts:
    - Overwrite only the GENERATED blocks in `spec.md` and `plan.md`
-   - Recompute and update the **Token & Cost Estimate (Generated)** section in `plan.md` (see Phase 1.6)
    - Preserve LOCAL OVERRIDES blocks byte-for-byte
 4. Update `metadata.json` with snapshot hashes/timestamps and `last_sync_status`.
 

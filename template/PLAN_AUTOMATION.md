@@ -66,10 +66,6 @@ Agent behavior (fully automated):
 - Rewrite only the GENERATED blocks in:
   - `spec.md`
   - `plan.md`
-- Compute / refresh the **Token & Cost Estimate (Generated)** section in `plan.md`.
-  - Raw token estimates must always be produced.
-  - USD estimates must be blocked (but raw tokens still shown) if `.conductor/llm_pricing.json` is missing or lacks the requested provider/model.
-  - Cache-aware USD must always include a scenario range at cache_hit_rate = 0.0 / 0.5 / 1.0.
 - Preserve LOCAL OVERRIDES blocks byte-for-byte.
 
 4) Update metadata
@@ -133,21 +129,11 @@ Rules:
 - Users may edit LOCAL OVERRIDES freely.
 - Users should not edit GENERATED blocks directly.
 
-## Token + Cost Estimation (required)
-The generated `plan.md` must include a **Token & Cost Estimate (Generated)** section.
+## How canonical plans become machine-readable
+Warp notebook (`warp_notebook`)
+- The canonical plan is a Warp Drive notebook URL (JS-gated in a browser).
+- The agent treats it as machine-readable via Warp’s ability to attach notebook content by ID (e.g., `<notebook:<id>>`) during an agent run.
 
-Config files
-- Estimator defaults: `.conductor/llm_estimator_defaults.json`
-- Pricing (required for USD section): `.conductor/llm_pricing.json`
-- Calibration samples (optional): `.conductor/llm_usage_samples.jsonl`
-
-Rules
-- Raw token estimates must always be present.
-- USD estimates are shown only when pricing is available; otherwise the USD section must be clearly marked as BLOCKED (missing pricing).
-- Cache-aware USD must always be shown as a scenario range at cache_hit_rate = 0.0 / 0.5 / 1.0.
-- If `.conductor/llm_usage_samples.jsonl` contains samples, use them to calibrate defaults in `.conductor/llm_estimator_defaults.json` (per provider/model).
-
-## How canonical plans are read
 Local markdown (`local_plan_markdown`)
 - The canonical plan is a normal file in the repo.
 - The agent reads it directly.
