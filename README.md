@@ -9,22 +9,22 @@ Conductor Kit is a repo-local, IDE-agnostic way to run context-driven developmen
 - Plans are captured in a **canonical plan** format (repo-local markdown) and converted into Conductor tracks.
 - The system produces durable artifacts (snapshots and diffs) so work is auditable and repeatable.
 
-Conductor Kit is a port of the Gemini CLI [Conductor](https://github.com/gemini-cli-extensions/conductor) extension. It is not a 1:1 copy; it is a close recreation with modifications and additional features. The original Conductor extension was built for Gemini CLI only. Conductor Kit takes the same approach and makes it available to Warp, Cursor, and any IDE that supports agent rules files (`AGENTS.md`, `.cursorrules`, or similar).
+Conductor Kit is a port of the Gemini CLI [Conductor](https://github.com/gemini-cli-extensions/conductor) extension. It is not a 1:1 copy; modifications have been made and features added. The original Conductor extension was built for Gemini CLI only. Conductor Kit takes the same approach and makes it available to Warp, Cursor, and any IDE that supports agent rules files (`AGENTS.md`, `.cursorrules`, or similar).
 
-The original Conductor introduced a simple idea: store your product context, tech stack constraints, and workflow preferences in the repo alongside your code. When your AI assistant starts a task, it reads those files first. Work is organized into tracks (isolated directories for each feature or bug fix) with specs, plans, and implementation checkpoints. The result is that your AI assistant follows a consistent protocol instead of starting fresh every session.
+The original Conductor introduced a simple idea: store your product context, tech stack constraints, and workflow preferences in the repo alongside your code. When your code agent starts a task, it reads those files first. Work is organized into tracks (isolated directories for each feature or bug fix) with specs, plans, and implementation checkpoints. The result is that your code agent follows a consistent protocol instead of starting fresh every session.
 
 Conductor Kit packages this into a template that gets installed into any repo, a CLI to manage installations, and integration files for different IDEs.
 
 ## Who is this for
 
-- **Solopreneurs**: You're building alone with an AI assistant. Conductor Kit keeps your product context and tech decisions in files that persist across sessions, so your assistant doesn't lose track of what you're building or how.
+- **Solopreneurs**: You're building alone with an code agent. Conductor Kit keeps your product context and tech decisions in files that persist across sessions, so your code agent doesn't lose track of what you're building or how.
 - **Startups**: Multiple people (or multiple agents) work in the same codebase. The shared context files in `.conductor/` give everyone the same starting point. New team members can read `product.md` and `tech-stack.md` to get oriented.
 - **Small tech companies**: You have an established product and you're adding features. The track/plan/spec workflow gives you a structured way to define work before implementation starts, and phase checkpoints let you verify along the way.
 - **Enterprise product teams**: You need auditable, repeatable workflows. Track artifacts (plan snapshots, diffs, scan reports, memory transcripts) provide a paper trail for every piece of AI-assisted work.
 
 ## Features
 
-- **Context-driven development**: Product goals, tech stack constraints, and workflow preferences live in `.conductor/` as markdown files. Your AI assistant reads them before every interaction, so it works with your project's actual constraints instead of guessing.
+- **Context-driven development**: Product goals, tech stack constraints, and workflow preferences live in `.conductor/` as markdown files. Your code agent reads them before every interaction, so it works with your project's actual constraints instead of guessing.
 
 - **Tracks**: Each feature or bug fix gets its own directory (`.conductor/tracks/<track_id>/`) with a spec, plan, and metadata file. Tracks keep units of work isolated and make progress visible through task status markers.
 
@@ -92,14 +92,14 @@ python3 ~/conductor-kit/bin/conductor init .
 
 This creates:
 - `.conductor/` directory with:
-  - `CONDUCTOR.md`: the master rule that guides your AI assistant
+  - `CONDUCTOR.md`: the master rule that guides your code agent
   - `workflow.md`: the TDD and checkpoint protocol
   - `CONDUCTOR_README.md`, config files, `.gitignore`
   - `memory/`: Conductor Memory config and local DB scaffold
   - `tracks/`: where track directories will live
   - `archive/`: for completed/archived tracks
-  - `product.md`: placeholder for product context (populated by the AI assistant)
-  - `tech-stack.md`: placeholder for tech constraints (populated by the AI assistant)
+  - `product.md`: placeholder for product context (populated by the code agent)
+  - `tech-stack.md`: placeholder for tech constraints (populated by the code agent)
 - `PLAN_AUTOMATION.md` at the repo root
 
 #### Step 2: Add IDE integration
@@ -147,7 +147,7 @@ Conductor is opt-in. It only activates when you explicitly trigger it.
 
 ### Trigger phrases
 
-Your AI assistant will engage Conductor when you say:
+Your code agent will engage Conductor when you say:
 - "Start a new track" / "Create conductor track"
 - "Use Conductor"
 - "Update plan" / "Update the plan"
@@ -156,7 +156,7 @@ Your AI assistant will engage Conductor when you say:
 - "Execute plan" / "Execute the plan" / "Implement the plan"
 - Or reference a Conductor artifact (e.g., "Check the spec for track X")
 
-If you don't use a trigger phrase, the assistant behaves normally.
+If you don't use a trigger phrase, the code agent behaves normally.
 
 ### The workflow
 
@@ -164,7 +164,7 @@ If you don't use a trigger phrase, the assistant behaves normally.
 
 Say: "Start a new track for [Feature Name]"
 
-The assistant will:
+The code agent will:
 1. Create a track directory (`.conductor/tracks/<track_id>/`)
 2. Ask you for the canonical plan markdown file (default: `.conductor/tracks/<track_id>/canonical_plan.md`) and the canonical plan content
 3. Interview you to gather requirements (goal, functional/non-functional requirements, out of scope, acceptance criteria)
@@ -172,7 +172,7 @@ The assistant will:
 
 #### 2. Plan
 
-Once the spec is ready, the assistant will:
+Once the spec is ready, the code agent will:
 1. Generate `plan.md` based on the spec and canonical plan
 2. Break work into phases and tasks
 3. Add phase checkpoints for manual verification
@@ -181,13 +181,13 @@ Once the spec is ready, the assistant will:
 
 Before implementation, say: "Scan plan"
 
-The assistant will cross-check the canonical plan against the spec and plan, then produce a scan report with findings grouped by severity (blocker / warning / suggestion). To save the report to the repo, say: "Save scan report".
+The code agent will cross-check the canonical plan against the spec and plan, then produce a scan report with findings grouped by severity (blocker / warning / suggestion). To save the report to the repo, say: "Save scan report".
 
 #### 4. Implement
 
 Say: "Execute the plan" or "Implement track \<track_id\>"
 
-The assistant will:
+The code agent will:
 1. Follow the TDD workflow (Red → Green → Refactor) from `workflow.md`
 2. Update task statuses in `plan.md` as it works (`[ ]` → `[~]` → `[x]`)
 3. Stop at phase checkpoints for your verification
@@ -195,20 +195,20 @@ The assistant will:
 #### 5. Finalize
 
 When the track is complete:
-1. The assistant may propose updates to `product.md` and `tech-stack.md` if the track changed the product scope or introduced new tech
+1. The code agent may propose updates to `product.md` and `tech-stack.md` if the track changed the product scope or introduced new tech
 2. The track can be archived to `.conductor/archive/`
 
 ### Updating a plan
 
 If you change the canonical plan markdown file, say: "Update the plan"
 
-The assistant will sync the canonical plan into the track, regenerate `spec.md` and `plan.md` (preserving local overrides), and store a snapshot and diff.
+The code agent will sync the canonical plan into the track, regenerate `spec.md` and `plan.md` (preserving local overrides), and store a snapshot and diff.
 
 ### Scanning a plan (recommended)
 
 Before implementation, say: "Scan plan"
 
-The assistant will cross-check the canonical plan markdown against the track `spec.md` and `plan.md`, then produce a structured scan report highlighting conflicts, contradictions, gaps, and clarification questions.
+The code agent will cross-check the canonical plan markdown against the track `spec.md` and `plan.md`, then produce a structured scan report highlighting conflicts, contradictions, gaps, and clarification questions.
 
 To save the report to the repo (optional), say: "Save scan report".
 
