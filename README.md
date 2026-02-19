@@ -9,9 +9,9 @@ Conductor Kit is a repo-local, IDE-agnostic way to run context-driven developmen
 - Plans are captured in a **canonical plan** format (repo-local markdown) and converted into Conductor tracks.
 - The system produces durable artifacts (snapshots and diffs) so work is auditable and repeatable.
 
-Conductor Kit is a port of the Gemini CLI [Conductor](https://github.com/gemini-cli-extensions/conductor) extension. It is not a 1:1 copy; it is a close recreation with modifications and additional features. The original Conductor extension was built for Gemini CLI only. Conductor Kit takes the same approach and makes it available to Warp, Cursor, and any IDE that supports agent rules files (`AGENTS.md`, `.cursorrules`, or similar).
+Conductor Kit is a port of the Gemini CLI [Conductor](https://github.com/gemini-cli-extensions/conductor) extension. It's not a 1:1 copy; I've made modifications and added features. The original Conductor extension was built for Gemini CLI only. Conductor Kit takes the concept and makes it available to Warp, Cursor, and any IDE that supports agent rules/files (`AGENTS.md`, `.cursorrules`, or similar).
 
-The original Conductor introduced a simple idea: store your product context, tech stack constraints, and workflow preferences in the repo alongside your code. When your AI assistant starts a task, it reads those files first. Work is organized into tracks (isolated directories for each feature or bug fix) with specs, plans, and implementation checkpoints. The result is that your AI assistant follows a consistent protocol instead of starting fresh every session.
+The original Conductor introduced a simple idea: store your product context, tech stack constraints, and workflow preferences in the repo alongside your code. When your AI assistant starts a task, it reads those files first. Work is organized into tracks (isolated directories for each feature or bug fix) with specs, plans, and implementation checkpoints. The result is that your code agent follows a consistent protocol instead of starting fresh every session.
 
 Conductor Kit packages this into a template that gets installed into any repo, a CLI to manage installations, and integration files for different IDEs.
 
