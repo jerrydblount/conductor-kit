@@ -25,12 +25,9 @@ Conductor supports one canonical plan source:
 
 ## Supported user commands
 The agent recognizes these commands and runs the described workflow.
+Use `"use conductor"` / `"create conductor track"` to start planning and track setup.
 
-### 1) "create plan" / "create a plan"
-Agent behavior:
-- Create a repo-local canonical plan markdown file (recommended: `.conductor/tracks/<track_id>/canonical_plan.md`) and ask the user to provide the canonical plan content.
-
-### 2) "use conductor" / "create conductor track"
+### 1) "use conductor" / "create conductor track"
 Agent behavior:
 - Ask for the track id (if not provided).
 - Ask for the canonical plan markdown path (default: `.conductor/tracks/<track_id>/canonical_plan.md`).
@@ -46,7 +43,7 @@ Agent behavior:
 Guarantee:
 - From this point on, `spec.md` and `plan.md` are treated as **generated** outputs from the canonical plan snapshot.
 
-### 3) "update plan" / "update the plan"
+### 2) "update plan" / "update the plan"
 Agent behavior (fully automated):
 
 1) Sync canonical plan → snapshot
@@ -82,20 +79,20 @@ Update `.conductor/tracks/<track_id>/metadata.json` with:
 Hard stop rule:
 - If the snapshot cannot be generated (canonical plan not accessible), the agent must STOP and report what is missing.
 
-### 4) "scan plan" / "scan the plan"
+### 3) "scan plan" / "scan the plan"
 Agent behavior:
 - Ask for the track id (if not provided).
 - Read the canonical plan markdown and cross-check it against the track `spec.md` and `plan.md`.
 - Produce a structured scan report in chat (do not write files unless the user asks to "save scan report").
 
-### 5) "execute plan" / "execute the plan" / "implement the plan"
+### 4) "execute plan" / "execute the plan" / "implement the plan"
 Agent behavior:
 - Recommend running "scan plan" first (optional but recommended).
 - Read the track `spec.md` + `plan.md`.
 - Implement tasks phase-by-phase per `.conductor/workflow.md`.
 - Stop at checkpoints.
 
-### 6) "save scan report"
+### 5) "save scan report"
 Agent behavior:
 - Save the most recent scan report to `.conductor/tracks/<track_id>/plan_scans/<YYYYMMDD_HHMMSSZ>.md`.
 - If no scan has been run yet, run "scan plan" first, then save.
