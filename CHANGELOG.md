@@ -6,6 +6,15 @@ Conductor Kit follows Semantic Versioning (SemVer).
 - Minor: backwards-compatible features
 - Major: breaking changes (see BREAKING CHANGES notes below and `UPGRADING.md`)
 
+## [Unreleased]
+
+Changed:
+- Updated plan automation documentation/templates to remove the `create-plan` alias.
+- Updated repository docs and licensing (`README.md`, `LICENSE`).
+
+Removed:
+- Removed token/cost estimation functionality and related template artifacts from the toolkit.
+
 ## [0.3.0] - 2026-02-12
 
 Added:
